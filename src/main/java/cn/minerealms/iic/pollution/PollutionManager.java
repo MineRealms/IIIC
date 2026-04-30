@@ -79,8 +79,8 @@ public class PollutionManager {
     /** Threshold for converting temporary pollution to permanent pollution */
     public static double TEMP_TO_PERM_THRESHOLD = 200.0;
 
-    /** Conversion rate for temporary to permanent pollution (per second) */
-    public static double TEMP_TO_PERM_RATE = 0.001;
+    /** Conversion rate for temporary to permanent pollution (per second, proportional) */
+    public static double TEMP_TO_PERM_RATE = 0.0005;
 
     /** Conversion rate for permanent pollution to difficulty */
     public static double PERM_TO_DIFFICULTY_RATE = 0.1;
@@ -203,9 +203,9 @@ public class PollutionManager {
                                 if (GTIntegration.isGTMachine(be)) {
                                     if (GTIntegration.hasEnergyOrActive(be)) {
                                         int tier = GTIntegration.getVoltageTier(be);
-                                        // Reasonable pollution generation: base 0.01, linear growth
-                                        // tier 0 (ULV) = 0.01/s, tier 2 (MV) = 0.03/s, tier 4 (EV) = 0.05/s
-                                        double pollutionValue = 0.01 * (1 + tier * 0.5);
+                                        // Exponential pollution generation (Factorio style)
+                                        // tier 0 (ULV) = 0.01/s, tier 2 (MV) = 0.035/s, tier 4 (EV) = 0.087/s, tier 6 (IV) = 0.21/s
+                                        double pollutionValue = 0.01 * (1 + Math.pow(tier, 1.3) * 0.25);
 
                                         // Multiblock structures produce more pollution (3x)
                                         if (GTIntegration.isMultiblock(be)) {
@@ -263,23 +263,27 @@ public class PollutionManager {
                 double current = temporaryPollution.get(cPos);
                 totalTempPollution += current;
 
-                // When temporary pollution exceeds threshold, convert to permanent
-                if (current > TEMP_TO_PERM_THRESHOLD) {
-                    double converted = current * TEMP_TO_PERM_RATE;
-                    addPermanentPollution(converted);
+                // Proportional conversion to permanent pollution (always active)
+                double converted = current * TEMP_TO_PERM_RATE;
+                addPermanentPollution(converted);
 
-                    if (IndustrialLogger.isDebugEnabled() && level.getGameTime() % 100 == 0) {
-                        IndustrialLogger.debugPollution(String.format(
-                                "Chunk %s: Temp pollution %.2f -> Converting %.4f to permanent",
-                                cPos, current, converted));
-                    }
+                if (IndustrialLogger.isDebugEnabled() && level.getGameTime() % 100 == 0) {
+                    IndustrialLogger.debugPollution(String.format(
+                            "Chunk %s: Temp pollution %.2f -> Converting %.4f to permanent",
+                            cPos, current, converted));
                 }
 
-                // Calculate decay and new additions
-                double reduction = 0.05;
-                reduction += getSurroundingEnvironmentalReduction(cPos);
+                // Proportional decay (0.2% per second)
+                double reduction = current * 0.002;
+                // Environmental absorption with cap (max 10% of current pollution)
+                double envReduction = getSurroundingEnvironmentalReduction(cPos);
+                double envCap = current * 0.1;
+                reduction += Math.min(envCap, envReduction);
                 double added = newPollutionThisSec.getOrDefault(cPos, 0.0);
                 double nextVal = Math.max(0.0, current - reduction + added);
+
+                // Pollution diffusion to neighbors (Factorio style - creates pollution clouds)
+                nextVal = applyPollutionDiffusion(temporaryPollution, cPos, nextVal, 0.15);
 
                 if (nextVal <= 0.001) {
                     temporaryPollution.remove(cPos);
@@ -341,6 +345,24 @@ public class PollutionManager {
             }
         }
         return totalReduction;
+    }
+
+    /**
+     * Applies pollution diffusion to neighboring chunks.
+     * Creates pollution cloud spread effect (Factorio core experience).
+     */
+    private static double applyPollutionDiffusion(Map<ChunkPos, Double> pollutionMap, ChunkPos center, double selfPollution, double diffusionRate) {
+        double totalDiffused = 0;
+        for (int dx = -1; dx <= 1; dx++) {
+            for (int dz = -1; dz <= 1; dz++) {
+                if (dx == 0 && dz == 0) continue;
+                ChunkPos neighbor = new ChunkPos(center.x + dx, center.z + dz);
+                double neighborPollution = pollutionMap.getOrDefault(neighbor, 0.0);
+                double diff = (selfPollution - neighborPollution) * diffusionRate;
+                totalDiffused += diff;
+            }
+        }
+        return selfPollution - totalDiffused;
     }
 
     /**
