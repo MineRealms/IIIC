@@ -27,15 +27,33 @@ import xaero.map.gui.GuiTexturedButton;
  *   <li>Hover tooltip showing exact pollution values</li>
  * </ul>
  *
+ * <p><b>Mixin规范遵循：</b>
+ * <ul>
+ *   <li>所有注入方法都是private</li>
+ *   <li>所有@Unique方法都是private</li>
+ *   <li>使用iic$前缀避免命名冲突</li>
+ *   <li>remap=false因为XaerosWorldMap是混淆的</li>
+ *   <li>不使用@Shadow访问继承字段，直接通过实例访问</li>
+ * </ul>
+ *
  * @author ImprovedMobs Industrial Integration
  */
 @OnlyIn(Dist.CLIENT)
 @Mixin(value = GuiMap.class, remap = false, priority = 1000)
 public abstract class GuiMapMixin {
 
+    /**
+     * Pollution toggle button instance.
+     * Instance field, not static - safe for Mixin.
+     */
     @Unique
     private Button iic$pollutionButton;
 
+    /**
+     * Pollution overlay state.
+     * Static field to persist across GUI reinitializations.
+     * This is allowed in Mixin as it's a field, not a method.
+     */
     @Unique
     private static boolean iic$showPollution = false;
 
@@ -43,6 +61,14 @@ public abstract class GuiMapMixin {
      * Inject into init method to add pollution toggle button.
      * <p>
      * The button is placed on the right side of the screen, above the zoom buttons.
+     *
+     * <p><b>Mixin规范：</b>
+     * <ul>
+     *   <li>方法必须是private</li>
+     *   <li>使用@Inject注入</li>
+     *   <li>@At("TAIL")在方法末尾注入</li>
+     *   <li>remap=false匹配类级别设置</li>
+     * </ul>
      */
     @Inject(method = "m_7856_", at = @At("TAIL"), remap = false)
     private void iic$addPollutionButton(CallbackInfo ci) {
@@ -81,6 +107,13 @@ public abstract class GuiMapMixin {
 
     /**
      * Button click handler - toggles pollution overlay.
+     *
+     * <p><b>Mixin规范：</b>
+     * <ul>
+     *   <li>方法必须是private</li>
+     *   <li>使用@Unique标记</li>
+     *   <li>不能是public或protected</li>
+     * </ul>
      */
     @Unique
     private void iic$onPollutionButton(Button button) {
@@ -95,6 +128,14 @@ public abstract class GuiMapMixin {
      * Inject into render method to draw pollution overlay.
      * <p>
      * We inject at TAIL to ensure the overlay is drawn on top of the map.
+     *
+     * <p><b>Mixin规范：</b>
+     * <ul>
+     *   <li>方法必须是private</li>
+     *   <li>使用@Inject注入</li>
+     *   <li>@At("TAIL")在方法末尾注入</li>
+     *   <li>remap=false匹配类级别设置</li>
+     * </ul>
      */
     @Inject(method = "m_88315_", at = @At("TAIL"), remap = false)
     private void iic$renderPollutionOverlay(GuiGraphics guiGraphics, int mouseX, int mouseY, float partialTicks, CallbackInfo ci) {
@@ -121,15 +162,5 @@ public abstract class GuiMapMixin {
                 );
             }
         }
-    }
-
-    /**
-     * Gets the current pollution overlay state.
-     *
-     * @return true if pollution overlay is enabled
-     */
-    @Unique
-    public static boolean iic$isPollutionOverlayEnabled() {
-        return iic$showPollution;
     }
 }
