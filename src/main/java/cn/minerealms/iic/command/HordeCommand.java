@@ -204,7 +204,7 @@ public class HordeCommand {
             return 1.0;
         }
 
-        double[] multipliers = HordeIntegrationManager.tierIntensityMultipliers;
+        double[] multipliers = TriAxisConfig.hordeTierIntensityMultipliers;
         if (tier < 0 || tier >= multipliers.length) {
             return multipliers[multipliers.length - 1];
         }
@@ -216,22 +216,10 @@ public class HordeCommand {
         boolean value = Boolean.parseBoolean(valueStr);
 
         switch (key) {
-            case "enableHordeIntegration" -> {
-                TriAxisConfig.enableHordeIntegration = value;
-                HordeIntegrationManager.enableHordeIntegration = value;
-            }
-            case "enablePollutionTriggeredHordes" -> {
-                TriAxisConfig.enablePollutionTriggeredHordes = value;
-                HordeIntegrationManager.enablePollutionTriggeredHordes = value;
-            }
-            case "enableSkirmishes" -> {
-                TriAxisConfig.enableSkirmishes = value;
-                HordeIntegrationManager.enableSkirmishes = value;
-            }
-            case "enableMachineTargeting" -> {
-                TriAxisConfig.enableMachineTargeting = value;
-                HordeIntegrationManager.enableMachineTargeting = value;
-            }
+            case "enableHordeIntegration" -> TriAxisConfig.enableHordeIntegration = value;
+            case "enablePollutionTriggeredHordes" -> TriAxisConfig.enablePollutionTriggeredHordes = value;
+            case "enableSkirmishes" -> TriAxisConfig.enableSkirmishes = value;
+            case "enableMachineTargeting" -> TriAxisConfig.enableMachineTargeting = value;
         }
 
         TriAxisConfig.syncToConfig();
@@ -243,14 +231,8 @@ public class HordeCommand {
 
     private static int setDouble(CommandContext<CommandSourceStack> ctx, String key, double value) {
         switch (key) {
-            case "hordeIntensityMultiplier" -> {
-                TriAxisConfig.hordeIntensityMultiplier = value;
-                HordeIntegrationManager.hordeIntensityMultiplier = value;
-            }
-            case "pollutionHordeTriggerThreshold" -> {
-                TriAxisConfig.pollutionHordeTriggerThreshold = value;
-                HordeIntegrationManager.pollutionHordeTriggerThreshold = value;
-            }
+            case "hordeIntensityMultiplier" -> TriAxisConfig.hordeIntensityMultiplier = value;
+            case "pollutionHordeTriggerThreshold" -> TriAxisConfig.pollutionHordeTriggerThreshold = value;
         }
 
         TriAxisConfig.syncToConfig();
@@ -263,13 +245,7 @@ public class HordeCommand {
     private static int reloadConfig(CommandContext<CommandSourceStack> ctx) {
         cn.minerealms.iic.core.config.ConfigManager.reload();
 
-        // Sync to HordeIntegrationManager
-        HordeIntegrationManager.enableHordeIntegration = TriAxisConfig.enableHordeIntegration;
-        HordeIntegrationManager.hordeIntensityMultiplier = TriAxisConfig.hordeIntensityMultiplier;
-        HordeIntegrationManager.enablePollutionTriggeredHordes = TriAxisConfig.enablePollutionTriggeredHordes;
-        HordeIntegrationManager.pollutionHordeTriggerThreshold = TriAxisConfig.pollutionHordeTriggerThreshold;
-        HordeIntegrationManager.enableSkirmishes = TriAxisConfig.enableSkirmishes;
-        HordeIntegrationManager.enableMachineTargeting = TriAxisConfig.enableMachineTargeting;
+        // No need to sync - HordeIntegrationManager now reads directly from TriAxisConfig
 
         ctx.getSource().sendSuccess(() ->
             Component.literal("§a✓ Horde configuration reloaded successfully!"), true);

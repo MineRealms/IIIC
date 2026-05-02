@@ -37,6 +37,12 @@ public class DifficultyConfig {
     public final ForgeConfigSpec.DoubleValue speedMultFactor;
     public final ForgeConfigSpec.DoubleValue armorMultFactor;
 
+    // Attribute caps (new)
+    public final ForgeConfigSpec.DoubleValue maxHpMultiplier;
+    public final ForgeConfigSpec.DoubleValue maxAttackMultiplier;
+    public final ForgeConfigSpec.DoubleValue maxSpeedMultiplier;
+    public final ForgeConfigSpec.DoubleValue maxArmorMultiplier;
+
     // Voltage tier HP targets
     public final ForgeConfigSpec.DoubleValue ulvHpTarget;
     public final ForgeConfigSpec.DoubleValue lvHpTarget;
@@ -83,7 +89,7 @@ public class DifficultyConfig {
 
         globalMultiplier = builder
                 .comment("Global difficulty multiplier (1.0-5.0 recommended) - Higher values make mobs stronger overall")
-                .defineInRange("global_multiplier", 2.8, 0.1, 10.0);
+                .defineInRange("global_multiplier", 2.0, 0.1, 10.0);
 
         emaAlpha = builder
                 .comment("Exponential moving average alpha for smoothing (0.01-0.2) - Lower = smoother, higher = faster response")
@@ -91,7 +97,7 @@ public class DifficultyConfig {
 
         pollutionDenominator = builder
                 .comment("Pollution saturation threshold (500-1500 recommended) - Higher values require more pollution for high difficulty")
-                .defineInRange("pollution_denominator", 800.0, 100.0, 5000.0);
+                .defineInRange("pollution_denominator", 150.0, 100.0, 5000.0);
 
         builder.pop();
 
@@ -151,11 +157,11 @@ public class DifficultyConfig {
 
         hpMultFactor = builder
                 .comment("Health multiplier factor (0.5-5.0)")
-                .defineInRange("hp_mult_factor", 2.2, 0.1, 10.0);
+                .defineInRange("hp_mult_factor", 1.8, 0.1, 10.0);
 
         attackMultFactor = builder
                 .comment("Attack damage multiplier factor (0.5-3.0)")
-                .defineInRange("attack_mult_factor", 1.6, 0.1, 10.0);
+                .defineInRange("attack_mult_factor", 1.4, 0.1, 10.0);
 
         speedMultFactor = builder
                 .comment("Speed multiplier factor (0.3-2.0)")
@@ -164,6 +170,27 @@ public class DifficultyConfig {
         armorMultFactor = builder
                 .comment("Armor multiplier factor (0.5-2.0)")
                 .defineInRange("armor_mult_factor", 1.2, 0.1, 5.0);
+
+        builder.pop();
+
+        builder.comment("Attribute Caps - Prevents infinite attribute growth")
+                .push("attribute_caps");
+
+        maxHpMultiplier = builder
+                .comment("Maximum HP multiplier cap (5.0-25.0) - Default 15.0 (zombie max 300 HP)")
+                .defineInRange("max_hp_multiplier", 15.0, 1.0, 50.0);
+
+        maxAttackMultiplier = builder
+                .comment("Maximum attack multiplier cap (3.0-20.0) - Default 10.0 (zombie max 50 damage)")
+                .defineInRange("max_attack_multiplier", 10.0, 1.0, 50.0);
+
+        maxSpeedMultiplier = builder
+                .comment("Maximum speed multiplier cap (1.5-5.0)")
+                .defineInRange("max_speed_multiplier", 3.0, 1.0, 10.0);
+
+        maxArmorMultiplier = builder
+                .comment("Maximum armor multiplier cap (2.0-10.0)")
+                .defineInRange("max_armor_multiplier", 5.0, 1.0, 20.0);
 
         builder.pop();
 

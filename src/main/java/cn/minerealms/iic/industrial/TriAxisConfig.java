@@ -75,6 +75,51 @@ public class TriAxisConfig {
      */
     public static double pollutionDenominator = 800.0;
 
+    // ========== Multiplicative Difficulty Model Parameters ==========
+
+    /**
+     * Minimum base difficulty from time factor (0.3-0.7 recommended).
+     * Prevents difficulty from being too low in early game.
+     */
+    public static double baseMin = 0.5;
+
+    /**
+     * Maximum base difficulty from time factor (1.5-3.0 recommended).
+     * Caps the time-based difficulty growth.
+     */
+    public static double baseMax = 2.0;
+
+    /**
+     * Exponent for voltage tier scaling (1.0-1.5 recommended).
+     * Higher values create steeper difficulty curve with voltage tiers.
+     */
+    public static double scaleExponent = 1.2;
+
+    /**
+     * Multiplier for voltage tier scaling (0.1-0.3 recommended).
+     * Controls the strength of voltage tier impact on difficulty.
+     */
+    public static double scaleMultiplier = 0.15;
+
+    /**
+     * Minimum pressure multiplier from pollution (1.0 recommended).
+     * Base multiplier when pollution is zero.
+     */
+    public static double pressureMin = 1.0;
+
+    /**
+     * Maximum pressure multiplier from pollution (3.0-5.0 recommended).
+     * Maximum multiplier at extreme pollution levels.
+     */
+    public static double pressureMax = 4.0;
+
+    /**
+     * Sigmoid shift for pollution pressure curve (1.5-3.0 recommended).
+     * Controls the inflection point of the pollution curve.
+     * Higher values delay the pressure increase.
+     */
+    public static double sigmoidShift = 2.0;
+
     // ========== Industrial Bonus Configuration ==========
 
     /**
@@ -145,43 +190,89 @@ public class TriAxisConfig {
      * MV stage: Pollution threshold for zombies to attack machines.
      * When chunk pollution reaches this value, nearby zombies will target machines.
      */
-    public static double mvZombieAttackThreshold = 50.0;
+    public static double mvZombieAttackThreshold = 40.0;
 
     /**
      * HV stage: Pollution threshold for active zombie spawning.
      * When chunk pollution reaches this value, zombies will spawn near machines.
      */
-    public static double hvZombieSpawnThreshold = 80.0;
+    public static double hvZombieSpawnThreshold = 60.0;
 
     /**
      * HV stage: Pollution threshold for active creeper spawning.
      * When chunk pollution reaches this value, creepers will spawn near machines.
      */
-    public static double hvCreeperSpawnThreshold = 120.0;
+    public static double hvCreeperSpawnThreshold = 100.0;
 
     /**
      * Pollution threshold for charged creeper spawning.
      * When chunk pollution reaches this value, charged creepers may spawn.
      */
-    public static double chargedCreeperThreshold = 200.0;
+    public static double chargedCreeperThreshold = 180.0;
 
     /**
      * Zombie spawn chance per second (0.0-1.0).
-     * Default: 0.01 (1% chance per second)
+     * Default: 0.015 (1.5% chance per second)
      */
-    public static double zombieSpawnChance = 0.01;
+    public static double zombieSpawnChance = 0.015;
 
     /**
      * Creeper spawn chance per second (0.0-1.0).
-     * Default: 0.005 (0.5% chance per second)
+     * Default: 0.008 (0.8% chance per second)
      */
-    public static double creeperSpawnChance = 0.005;
+    public static double creeperSpawnChance = 0.008;
 
     /**
      * Charged creeper spawn chance per second (0.0-1.0).
-     * Default: 0.001 (0.1% chance per second)
+     * Default: 0.0015 (0.15% chance per second)
      */
-    public static double chargedCreeperChance = 0.001;
+    public static double chargedCreeperChance = 0.0015;
+
+    // ========== Wave System Configuration ==========
+
+    /**
+     * Base wave size for zombie waves.
+     * Default: 3
+     */
+    public static int waveBaseSize = 3;
+
+    /**
+     * Base wave size for creeper waves (smaller than zombie waves).
+     * Default: 2
+     */
+    public static int waveCreeperBaseSize = 2;
+
+    /**
+     * Pollution divisor for wave size calculation.
+     * Wave size increases by 1 per this amount of pollution.
+     * Default: 50 (1 extra mob per 50 pollution)
+     */
+    public static int wavePollutionDivisor = 50;
+
+    /**
+     * Voltage tier divisor for wave size calculation.
+     * Wave size increases by 1 per this many tiers.
+     * Default: 2 (1 extra mob per 2 tiers)
+     */
+    public static int waveTierDivisor = 2;
+
+    /**
+     * Maximum wave size for zombie waves (performance limit).
+     * Default: 15
+     */
+    public static int waveMaxSize = 15;
+
+    /**
+     * Maximum wave size for creeper waves (performance limit).
+     * Default: 10
+     */
+    public static int waveCreeperMaxSize = 10;
+
+    /**
+     * Chance for a mob in a wave to be a creeper instead of zombie.
+     * Default: 0.3 (30% creepers, 70% zombies)
+     */
+    public static double waveCreeperChance = 0.3;
 
     // ========== Pollution System Configuration ==========
 
@@ -208,22 +299,63 @@ public class TriAxisConfig {
     public static double multiblockPollutionMultiplier = 3.0;
 
     /**
+     * Natural pollution decay rate (proportional, per second).
+     * Default: 0.002 (0.2% per second)
+     * This is now proportional to current pollution, not a fixed value.
+     */
+    public static double naturalDecayRate = 0.002;
+
+    /**
+     * Pollution absorption rate per leaf block.
+     * Default: 0.00005 (降低树叶吸收效率)
+     */
+    public static double leafAbsorptionRate = 0.00005;
+
+    /**
+     * Pollution absorption rate per water block.
+     * Default: 0.00005
+     */
+    public static double waterAbsorptionRate = 0.00005;
+
+    /**
+     * Pollution absorption rate per grass block.
+     * Default: 0.00002
+     */
+    public static double grassAbsorptionRate = 0.00002;
+
+    /**
      * Threshold for converting temporary pollution to permanent pollution.
-     * When temporary pollution exceeds this value, it starts converting to permanent.
+     * Only pollution above this threshold converts to permanent.
+     * Default: 200.0
      */
     public static double tempToPermanentThreshold = 200.0;
 
     /**
      * Conversion rate from temporary to permanent pollution per second (0.0-1.0).
-     * Default: 0.001 (0.1% per second)
+     * Default: 0.005 (0.5% per second, increased from 0.001)
+     * Only applies to pollution above threshold.
      */
-    public static double tempToPermanentRate = 0.001;
+    public static double tempToPermanentRate = 0.005;
 
     /**
      * Conversion rate from permanent pollution to difficulty.
      * Higher values make permanent pollution more impactful on difficulty.
      */
     public static double permanentToDifficultyRate = 0.1;
+
+    // ========== Turret System Configuration (New) ==========
+
+    /**
+     * Flamethrower turret direct hit damage.
+     * Default: 4.0 (降低自 5.0)
+     */
+    public static double flamethrowerDirectDamage = 4.0;
+
+    /**
+     * Flamethrower turret ground fire damage per tick.
+     * Default: 1.5 (降低自 2.0)
+     */
+    public static double flamethrowerGroundDamage = 1.5;
 
     // ========== Scanning & Thresholds ==========
 
@@ -287,6 +419,36 @@ public class TriAxisConfig {
      * Multiplied with ImprovedMobs base config to determine final mob armor.
      */
     public static double armorMultFactor = 1.2;
+
+    // ========== Attribute Caps (New) ==========
+
+    /**
+     * Maximum HP multiplier cap (5.0-20.0).
+     * Prevents mob health from growing infinitely.
+     * Default: 15.0 (僵尸最高 300 HP)
+     */
+    public static double maxHpMultiplier = 15.0;
+
+    /**
+     * Maximum attack damage multiplier cap (3.0-15.0).
+     * Prevents mob damage from growing infinitely.
+     * Default: 10.0 (僵尸最高 50 伤害)
+     */
+    public static double maxAttackMultiplier = 10.0;
+
+    /**
+     * Maximum speed multiplier cap (1.5-5.0).
+     * Prevents mob speed from growing infinitely.
+     * Default: 3.0
+     */
+    public static double maxSpeedMultiplier = 3.0;
+
+    /**
+     * Maximum armor multiplier cap (2.0-10.0).
+     * Prevents mob armor from growing infinitely.
+     * Default: 5.0
+     */
+    public static double maxArmorMultiplier = 5.0;
 
     // ========== Voltage Tier HP Targets ==========
 
@@ -539,6 +701,24 @@ public class TriAxisConfig {
      */
     public static boolean enableVoltageTierScaling = true;
 
+    /**
+     * Voltage tier intensity multipliers for hordes (10 tiers: ULV to UHV).
+     * Each tier gets a multiplier that affects horde strength.
+     * Default: [1.0, 1.1, 1.3, 1.5, 1.8, 2.2, 2.6, 3.0, 3.5, 4.0]
+     */
+    public static double[] hordeTierIntensityMultipliers = {
+        1.0,  // ULV (Tier 0)
+        1.1,  // LV  (Tier 1)
+        1.3,  // MV  (Tier 2) - 小股袭扰开始
+        1.5,  // HV  (Tier 3) - 中等威胁
+        1.8,  // EV  (Tier 4)
+        2.2,  // IV  (Tier 5) - 大尸潮开始
+        2.6,  // LuV (Tier 6)
+        3.0,  // ZPM (Tier 7)
+        3.5,  // UV  (Tier 8)
+        4.0   // UHV (Tier 9) - 极限挑战
+    };
+
     // ========== Debug Settings ==========
 
     /**
@@ -559,6 +739,322 @@ public class TriAxisConfig {
      */
     public static boolean enableSporeDebug = false;
 
+    // ========== Spore Integration Configuration ==========
+
+    /**
+     * Pollution to biomass conversion rate for Spore Hiveminds.
+     * Reduced from 0.05 to prevent Biomass explosion.
+     * Default: 0.01 (1 biomass per 100 pollution every 5 seconds)
+     */
+    public static double sporePollutionToBiomassRate = 0.01;
+
+    /**
+     * Maximum Biomass per Proto Hivemind (prevents infinite growth).
+     * Default: 5000
+     */
+    public static int sporeMaxBiomassPerProto = 5000;
+
+    /**
+     * Pollution threshold for triggering Spore pollution feedback.
+     * Raised from 100 to delay feedback until mid-game.
+     * Default: 150.0
+     */
+    public static double sporePollutionFeedbackThreshold = 150.0;
+
+    /**
+     * Maximum health multiplier for Spore mobs (prevents stacking with ImprovedMobs).
+     * Default: 3.0 (max 3x health)
+     */
+    public static double sporeMaxHealthMultiplier = 3.0;
+
+    /**
+     * Maximum damage multiplier for Spore mobs (prevents stacking with ImprovedMobs).
+     * Default: 2.5 (max 2.5x damage)
+     */
+    public static double sporeMaxDamageMultiplier = 2.5;
+
+    /**
+     * Hivemind count saturation threshold for evolution calculation.
+     * Raised from 10 to slow down evolution progression.
+     * Default: 20
+     */
+    public static int sporeHivemindSaturation = 20;
+
+    /**
+     * Total Biomass saturation threshold for evolution calculation.
+     * Raised from 10000 to slow down evolution progression.
+     * Default: 30000
+     */
+    public static int sporeBiomassSaturation = 30000;
+
+    /**
+     * Host count saturation threshold for evolution calculation.
+     * Raised from 500 to slow down evolution progression.
+     * Default: 1000
+     */
+    public static int sporeHostSaturation = 1000;
+
+    /**
+     * Permanent pollution saturation threshold for evolution calculation.
+     * Default: 1500
+     */
+    public static double sporePollutionSaturation = 1500.0;
+
+    /**
+     * Hivemind weight in evolution calculation.
+     * Reduced from 0.35 to make pollution more important.
+     * Default: 0.20
+     */
+    public static double sporeEvolutionWeightHivemind = 0.20;
+
+    /**
+     * Biomass weight in evolution calculation.
+     * Reduced from 0.25 to balance with other factors.
+     * Default: 0.20
+     */
+    public static double sporeEvolutionWeightBiomass = 0.20;
+
+    /**
+     * Host weight in evolution calculation.
+     * Default: 0.15
+     */
+    public static double sporeEvolutionWeightHost = 0.15;
+
+    /**
+     * Pollution weight in evolution calculation.
+     * Increased from 0.15 to make pollution the primary driver.
+     * Default: 0.25
+     */
+    public static double sporeEvolutionWeightPollution = 0.25;
+
+    /**
+     * Voltage weight in evolution calculation.
+     * Increased from 0.10 to make technology progression more impactful.
+     * Default: 0.20
+     */
+    public static double sporeEvolutionWeightVoltage = 0.20;
+
+    // ========== Spore Mob Buff Parameters ==========
+
+    /**
+     * Pollution bonus divisor for Spore mob health calculation.
+     * Health bonus = pollution / divisor (max 100% at divisor value).
+     * Default: 200.0 (max bonus at 200 pollution)
+     */
+    public static double sporePollutionBonusDivisor = 200.0;
+
+    /**
+     * Voltage bonus per tier above ULV for Spore mobs.
+     * Each tier above ULV adds this percentage to health.
+     * Default: 0.10 (10% per tier)
+     */
+    public static double sporeVoltageBonusPerTier = 0.10;
+
+    /**
+     * Evolution bonus per phase for Spore mobs.
+     * Each evolution phase adds this percentage to health.
+     * Default: 0.05 (5% per phase, max 50% at phase 10)
+     */
+    public static double sporeEvolutionBonusPerPhase = 0.05;
+
+    /**
+     * Pollution threshold for Spore mob damage bonus.
+     * Damage bonus only applies when pollution exceeds this value.
+     * Default: 100.0
+     */
+    public static double sporeDamageBonusThreshold = 100.0;
+
+    /**
+     * Pollution divisor for Spore mob damage calculation.
+     * Damage bonus = pollution / divisor.
+     * Default: 200.0
+     */
+    public static double sporeDamageBonusDivisor = 200.0;
+
+    /**
+     * Damage bonus multiplier for Spore mobs.
+     * Final damage bonus = (pollution / divisor) * multiplier.
+     * Default: 0.3 (30% per 200 pollution)
+     */
+    public static double sporeDamageBonusMultiplier = 0.3;
+
+    /**
+     * Maximum voltage tier for Spore evolution normalization.
+     * Used to normalize voltage tier to 0.0-1.0 range.
+     * Default: 9.0 (UHV)
+     */
+    public static double sporeMaxVoltageTier = 9.0;
+
+    /**
+     * Infection intensity multiplier (phase to percentage conversion).
+     * Converts evolution phase (0-10) to infection intensity (0-100%).
+     * Default: 10.0
+     */
+    public static double sporeInfectionIntensityMultiplier = 10.0;
+
+    // ========== Pollution System Core Configuration ==========
+
+    /**
+     * Pollution update interval in ticks.
+     * How often pollution values are recalculated.
+     * Default: 20 ticks (1 second)
+     */
+    public static int pollutionUpdateInterval = 20;
+
+    /**
+     * Environment scan interval in ticks.
+     * How often the system scans for trees/plants that absorb pollution.
+     * Default: 6000 ticks (5 minutes)
+     */
+    public static int pollutionEnvironmentScanInterval = 6000;
+
+    /**
+     * Machine scan radius in chunks.
+     * How far to scan for pollution-generating machines.
+     * Default: 4 chunks
+     */
+    public static int pollutionMachineScanRadius = 4;
+
+    /**
+     * Tier exponent for pollution calculation.
+     * Used in formula: pollution = 0.01 * (1 + tier^exponent * multiplier)
+     * Default: 1.3
+     */
+    public static double pollutionTierExponent = 1.3;
+
+    /**
+     * Tier multiplier for pollution calculation.
+     * Default: 0.25
+     */
+    public static double pollutionTierMultiplier = 0.25;
+
+    /**
+     * Environment absorption factor.
+     * How much pollution each environment score point can absorb.
+     * Default: 0.002
+     */
+    public static double pollutionEnvAbsorptionFactor = 0.002;
+
+    /**
+     * Maximum environment absorption percentage.
+     * Cap on how much pollution can be absorbed per tick (as % of current).
+     * Default: 0.15 (15%)
+     */
+    public static double pollutionEnvAbsorptionMaxPercent = 0.15;
+
+    /**
+     * Pollution diffusion rate.
+     * How fast pollution spreads to neighboring chunks.
+     * Default: 0.15
+     */
+    public static double pollutionDiffusionRate = 0.15;
+
+    /**
+     * Pollution removal threshold.
+     * Pollution below this value is removed from the map.
+     * Default: 1.0
+     */
+    public static double pollutionRemovalThreshold = 1.0;
+
+    /**
+     * Spore feedback threshold.
+     * Total pollution required to trigger Spore biomass feedback.
+     * Default: 100.0
+     */
+    public static double pollutionSporeFeedbackThreshold = 100.0;
+
+    // ========== Performance and Debug Configuration ==========
+
+    /**
+     * Maximum global threat entities allowed.
+     * Limits total number of threat-spawned entities to prevent lag.
+     * Default: 200
+     */
+    public static int threatMaxGlobalEntities = 200;
+
+    /**
+     * Debug log interval in ticks.
+     * How often debug messages are logged (when debug is enabled).
+     * Default: 100 ticks (5 seconds)
+     */
+    public static int debugLogInterval = 100;
+
+    /**
+     * Spawn rate pollution divisor for threat system.
+     * Controls how pollution affects spawn rates: rate * (1.0 + pollution / divisor)
+     * Default: 200.0
+     */
+    public static double threatSpawnRatePollutionDivisor = 200.0;
+
+    // ========== Horde Threat Level System ==========
+
+    /**
+     * Distance threshold for threat level 5 (紧急 - Emergency).
+     * When nearest Hivemind is closer than this distance (in chunks).
+     * Default: 10.0 chunks
+     */
+    public static double hordeThreatLevel5Distance = 10.0;
+
+    /**
+     * Distance threshold for threat level 4 (严重 - Severe).
+     * Default: 20.0 chunks
+     */
+    public static double hordeThreatLevel4Distance = 20.0;
+
+    /**
+     * Distance threshold for threat level 3 (危险 - Dangerous).
+     * Default: 50.0 chunks
+     */
+    public static double hordeThreatLevel3Distance = 50.0;
+
+    /**
+     * Distance threshold for threat level 2 (紧张 - Tense).
+     * Default: 100.0 chunks
+     */
+    public static double hordeThreatLevel2Distance = 100.0;
+
+    /**
+     * Distance threshold for threat level 1 (警戒 - Alert).
+     * Default: 200.0 chunks
+     */
+    public static double hordeThreatLevel1Distance = 200.0;
+
+    /**
+     * Threat level update interval in ticks.
+     * How often to recalculate player threat levels.
+     * Default: 100 ticks (5 seconds)
+     */
+    public static int hordeThreatUpdateInterval = 100;
+
+    /**
+     * Horde cooldown duration in ticks.
+     * Minimum time between horde triggers for the same player.
+     * Default: 6000 ticks (5 minutes)
+     */
+    public static int hordePlayerCooldown = 6000;
+
+    // ========== XaerosWorldMap Integration ==========
+
+    /**
+     * Enable pollution overlay on XaerosWorldMap.
+     * When enabled, pollution levels are displayed as colored overlays on the world map.
+     * Default: true
+     */
+    public static boolean enablePollutionMapOverlay = true;
+
+    /**
+     * Alpha transparency for pollution overlay (0.0-1.0).
+     * Lower values make the overlay more transparent.
+     * Default: 0.4
+     */
+    public static double pollutionOverlayAlpha = 0.4;
+
+    /**
+     * Show exact pollution values in tooltip when hovering over chunks.
+     * Default: true
+     */
+    public static boolean showPollutionTooltip = true;
+
     /**
      * Configuration file location.
      */
@@ -575,13 +1071,36 @@ public class TriAxisConfig {
     public static void applyPreset(String preset) {
         switch (preset.toUpperCase()) {
             case "NORMAL" -> {
-                globalMultiplier = 2.0;
+                globalMultiplier = 2.0;  // 降低自 2.8
                 techWeight = 25.0;
                 pollutionWeight = 15.0;
-                hpMultFactor = 1.5;
-                attackMultFactor = 1.2;
+                hpMultFactor = 1.8;  // 降低自 2.2
+                attackMultFactor = 1.4;  // 降低自 1.6
                 targetDays = 800.0;
-                pollutionDenominator = 1000.0;
+                pollutionDenominator = 150.0;  // 提高自 100
+                // 新增属性上限
+                maxHpMultiplier = 15.0;
+                maxAttackMultiplier = 10.0;
+                maxSpeedMultiplier = 3.0;
+                maxArmorMultiplier = 5.0;
+                // 乘法模型参数
+                baseMin = 0.5;
+                baseMax = 2.0;
+                scaleExponent = 1.2;
+                scaleMultiplier = 0.15;
+                pressureMin = 1.0;
+                pressureMax = 4.0;
+                sigmoidShift = 2.0;
+                // 污染系统调整
+                naturalDecayRate = 0.002;  // 比例衰减 0.2%/秒
+                leafAbsorptionRate = 0.00005;  // 降低自 0.0001
+                tempToPermanentRate = 0.005;  // 提高自 0.001
+                tempToPermanentThreshold = 200.0;  // 阈值
+                // 威胁系统调整
+                hvZombieSpawnThreshold = 70.0;  // 降低自 80
+                zombieSpawnChance = 0.015;  // 提高自 0.01
+                creeperSpawnChance = 0.008;  // 提高自 0.005
+                chargedCreeperChance = 0.002;  // 提高自 0.001
             }
             case "HARD" -> {
                 globalMultiplier = 2.5;
@@ -590,7 +1109,27 @@ public class TriAxisConfig {
                 hpMultFactor = 2.0;
                 attackMultFactor = 1.5;
                 targetDays = 1000.0;
-                pollutionDenominator = 900.0;
+                pollutionDenominator = 150.0;
+                maxHpMultiplier = 18.0;
+                maxAttackMultiplier = 12.0;
+                maxSpeedMultiplier = 3.5;
+                maxArmorMultiplier = 6.0;
+                // 乘法模型参数
+                baseMin = 0.5;
+                baseMax = 2.2;
+                scaleExponent = 1.25;
+                scaleMultiplier = 0.17;
+                pressureMin = 1.0;
+                pressureMax = 4.5;
+                sigmoidShift = 1.8;
+                naturalDecayRate = 0.0018;  // 比例衰减，略快
+                leafAbsorptionRate = 0.00004;
+                tempToPermanentRate = 0.006;  // 更快转化
+                tempToPermanentThreshold = 180.0;  // 更低阈值
+                hvZombieSpawnThreshold = 65.0;
+                zombieSpawnChance = 0.018;
+                creeperSpawnChance = 0.010;
+                chargedCreeperChance = 0.003;
             }
             case "HARDCORE" -> {
                 globalMultiplier = 2.8;
@@ -599,7 +1138,27 @@ public class TriAxisConfig {
                 hpMultFactor = 2.2;
                 attackMultFactor = 1.6;
                 targetDays = 1200.0;
-                pollutionDenominator = 800.0;
+                pollutionDenominator = 150.0;
+                maxHpMultiplier = 20.0;
+                maxAttackMultiplier = 15.0;
+                maxSpeedMultiplier = 4.0;
+                maxArmorMultiplier = 7.0;
+                // 乘法模型参数
+                baseMin = 0.6;
+                baseMax = 2.5;
+                scaleExponent = 1.3;
+                scaleMultiplier = 0.18;
+                pressureMin = 1.0;
+                pressureMax = 5.0;
+                sigmoidShift = 1.5;
+                naturalDecayRate = 0.0015;  // 比例衰减，更慢
+                leafAbsorptionRate = 0.00003;
+                tempToPermanentRate = 0.007;  // 更快转化
+                tempToPermanentThreshold = 150.0;  // 更低阈值
+                hvZombieSpawnThreshold = 60.0;
+                zombieSpawnChance = 0.020;
+                creeperSpawnChance = 0.012;
+                chargedCreeperChance = 0.004;
             }
             case "INSANE" -> {
                 globalMultiplier = 3.5;
@@ -608,7 +1167,27 @@ public class TriAxisConfig {
                 hpMultFactor = 3.0;
                 attackMultFactor = 2.0;
                 targetDays = 1500.0;
-                pollutionDenominator = 600.0;
+                pollutionDenominator = 150.0;
+                maxHpMultiplier = 25.0;
+                maxAttackMultiplier = 20.0;
+                maxSpeedMultiplier = 5.0;
+                maxArmorMultiplier = 10.0;
+                // 乘法模型参数
+                baseMin = 0.7;
+                baseMax = 3.0;
+                scaleExponent = 1.4;
+                scaleMultiplier = 0.20;
+                pressureMin = 1.0;
+                pressureMax = 6.0;
+                sigmoidShift = 1.2;
+                naturalDecayRate = 0.001;  // 比例衰减，极慢
+                leafAbsorptionRate = 0.00002;
+                tempToPermanentRate = 0.010;  // 极快转化
+                tempToPermanentThreshold = 100.0;  // 极低阈值
+                hvZombieSpawnThreshold = 50.0;
+                zombieSpawnChance = 0.025;
+                creeperSpawnChance = 0.015;
+                chargedCreeperChance = 0.005;
             }
             // CUSTOM does not modify any values, uses config file values
         }
@@ -674,6 +1253,15 @@ public class TriAxisConfig {
                 emaAlpha = Double.parseDouble(props.getProperty("emaAlpha", String.valueOf(emaAlpha)));
                 pollutionDenominator = Double.parseDouble(props.getProperty("pollutionDenominator", String.valueOf(pollutionDenominator)));
 
+                // 乘法模型参数
+                baseMin = Double.parseDouble(props.getProperty("baseMin", String.valueOf(baseMin)));
+                baseMax = Double.parseDouble(props.getProperty("baseMax", String.valueOf(baseMax)));
+                scaleExponent = Double.parseDouble(props.getProperty("scaleExponent", String.valueOf(scaleExponent)));
+                scaleMultiplier = Double.parseDouble(props.getProperty("scaleMultiplier", String.valueOf(scaleMultiplier)));
+                pressureMin = Double.parseDouble(props.getProperty("pressureMin", String.valueOf(pressureMin)));
+                pressureMax = Double.parseDouble(props.getProperty("pressureMax", String.valueOf(pressureMax)));
+                sigmoidShift = Double.parseDouble(props.getProperty("sigmoidShift", String.valueOf(sigmoidShift)));
+
                 // 工业加成
                 techWeight = Double.parseDouble(props.getProperty("techWeight", String.valueOf(techWeight)));
                 pollutionWeight = Double.parseDouble(props.getProperty("pollutionWeight", String.valueOf(pollutionWeight)));
@@ -693,6 +1281,12 @@ public class TriAxisConfig {
                 attackMultFactor = Double.parseDouble(props.getProperty("attackMultFactor", String.valueOf(attackMultFactor)));
                 speedMultFactor = Double.parseDouble(props.getProperty("speedMultFactor", String.valueOf(speedMultFactor)));
                 armorMultFactor = Double.parseDouble(props.getProperty("armorMultFactor", String.valueOf(armorMultFactor)));
+
+                // 属性上限
+                maxHpMultiplier = Double.parseDouble(props.getProperty("maxHpMultiplier", String.valueOf(maxHpMultiplier)));
+                maxAttackMultiplier = Double.parseDouble(props.getProperty("maxAttackMultiplier", String.valueOf(maxAttackMultiplier)));
+                maxSpeedMultiplier = Double.parseDouble(props.getProperty("maxSpeedMultiplier", String.valueOf(maxSpeedMultiplier)));
+                maxArmorMultiplier = Double.parseDouble(props.getProperty("maxArmorMultiplier", String.valueOf(maxArmorMultiplier)));
 
                 // 电压阶段血量目标
                 ulvHpTarget = Double.parseDouble(props.getProperty("ulvHpTarget", String.valueOf(ulvHpTarget)));
@@ -717,10 +1311,42 @@ public class TriAxisConfig {
                 tierGrowthFactor = Double.parseDouble(props.getProperty("tierGrowthFactor", String.valueOf(tierGrowthFactor)));
                 multiblockPollutionMultiplier = Double.parseDouble(props.getProperty("multiblockPollutionMultiplier", String.valueOf(multiblockPollutionMultiplier)));
 
+                // 污染衰减和吸收
+                naturalDecayRate = Double.parseDouble(props.getProperty("naturalDecayRate", String.valueOf(naturalDecayRate)));
+                leafAbsorptionRate = Double.parseDouble(props.getProperty("leafAbsorptionRate", String.valueOf(leafAbsorptionRate)));
+                waterAbsorptionRate = Double.parseDouble(props.getProperty("waterAbsorptionRate", String.valueOf(waterAbsorptionRate)));
+                grassAbsorptionRate = Double.parseDouble(props.getProperty("grassAbsorptionRate", String.valueOf(grassAbsorptionRate)));
+
+                // 污染转化
+                tempToPermanentThreshold = Double.parseDouble(props.getProperty("tempToPermanentThreshold", String.valueOf(tempToPermanentThreshold)));
+                tempToPermanentRate = Double.parseDouble(props.getProperty("tempToPermanentRate", String.valueOf(tempToPermanentRate)));
+                permanentToDifficultyRate = Double.parseDouble(props.getProperty("permanentToDifficultyRate", String.valueOf(permanentToDifficultyRate)));
+
+                // 炮塔系统
+                flamethrowerDirectDamage = Double.parseDouble(props.getProperty("flamethrowerDirectDamage", String.valueOf(flamethrowerDirectDamage)));
+                flamethrowerGroundDamage = Double.parseDouble(props.getProperty("flamethrowerGroundDamage", String.valueOf(flamethrowerGroundDamage)));
+
                 // 威胁触发等级配置
                 zombieAttackMinTier = Integer.parseInt(props.getProperty("zombieAttackMinTier", String.valueOf(zombieAttackMinTier)));
                 zombieSpawnMinTier = Integer.parseInt(props.getProperty("zombieSpawnMinTier", String.valueOf(zombieSpawnMinTier)));
                 creeperSpawnMinTier = Integer.parseInt(props.getProperty("creeperSpawnMinTier", String.valueOf(creeperSpawnMinTier)));
+
+                // 威胁系统详细配置
+                hvZombieSpawnThreshold = Double.parseDouble(props.getProperty("hvZombieSpawnThreshold", String.valueOf(hvZombieSpawnThreshold)));
+                hvCreeperSpawnThreshold = Double.parseDouble(props.getProperty("hvCreeperSpawnThreshold", String.valueOf(hvCreeperSpawnThreshold)));
+                chargedCreeperThreshold = Double.parseDouble(props.getProperty("chargedCreeperThreshold", String.valueOf(chargedCreeperThreshold)));
+                zombieSpawnChance = Double.parseDouble(props.getProperty("zombieSpawnChance", String.valueOf(zombieSpawnChance)));
+                creeperSpawnChance = Double.parseDouble(props.getProperty("creeperSpawnChance", String.valueOf(creeperSpawnChance)));
+                chargedCreeperChance = Double.parseDouble(props.getProperty("chargedCreeperChance", String.valueOf(chargedCreeperChance)));
+
+                // 波次系统配置
+                waveBaseSize = Integer.parseInt(props.getProperty("waveBaseSize", String.valueOf(waveBaseSize)));
+                waveCreeperBaseSize = Integer.parseInt(props.getProperty("waveCreeperBaseSize", String.valueOf(waveCreeperBaseSize)));
+                wavePollutionDivisor = Integer.parseInt(props.getProperty("wavePollutionDivisor", String.valueOf(wavePollutionDivisor)));
+                waveTierDivisor = Integer.parseInt(props.getProperty("waveTierDivisor", String.valueOf(waveTierDivisor)));
+                waveMaxSize = Integer.parseInt(props.getProperty("waveMaxSize", String.valueOf(waveMaxSize)));
+                waveCreeperMaxSize = Integer.parseInt(props.getProperty("waveCreeperMaxSize", String.valueOf(waveCreeperMaxSize)));
+                waveCreeperChance = Double.parseDouble(props.getProperty("waveCreeperChance", String.valueOf(waveCreeperChance)));
 
                 // Hivemind接近系统
                 hivemindProximityRadius = Double.parseDouble(props.getProperty("hivemindProximityRadius", String.valueOf(hivemindProximityRadius)));
@@ -747,11 +1373,68 @@ public class TriAxisConfig {
                 machineTargetingChance = Double.parseDouble(props.getProperty("machineTargetingChance", String.valueOf(machineTargetingChance)));
                 enableVoltageTierScaling = Boolean.parseBoolean(props.getProperty("enableVoltageTierScaling", String.valueOf(enableVoltageTierScaling)));
 
+                // Load horde tier intensity multipliers array
+                String tierMultipliersStr = props.getProperty("hordeTierIntensityMultipliers", "1.0,1.1,1.3,1.5,1.8,2.2,2.6,3.0,3.5,4.0");
+                String[] tierMultipliersParts = tierMultipliersStr.split(",");
+                if (tierMultipliersParts.length == 10) {
+                    for (int i = 0; i < 10; i++) {
+                        hordeTierIntensityMultipliers[i] = Double.parseDouble(tierMultipliersParts[i].trim());
+                    }
+                }
+
                 // 预设和调试
                 difficultyPreset = props.getProperty("difficultyPreset", difficultyPreset);
                 enableDebugLines = Boolean.parseBoolean(props.getProperty("enableDebugLines", String.valueOf(enableDebugLines)));
                 enableDifficultyLogging = Boolean.parseBoolean(props.getProperty("enableDifficultyLogging", String.valueOf(enableDifficultyLogging)));
                 enableSporeDebug = Boolean.parseBoolean(props.getProperty("enableSporeDebug", String.valueOf(enableSporeDebug)));
+
+                // Spore 集成配置
+                sporePollutionToBiomassRate = Double.parseDouble(props.getProperty("sporePollutionToBiomassRate", String.valueOf(sporePollutionToBiomassRate)));
+                sporeMaxBiomassPerProto = Integer.parseInt(props.getProperty("sporeMaxBiomassPerProto", String.valueOf(sporeMaxBiomassPerProto)));
+                sporePollutionFeedbackThreshold = Double.parseDouble(props.getProperty("sporePollutionFeedbackThreshold", String.valueOf(sporePollutionFeedbackThreshold)));
+                sporeMaxHealthMultiplier = Double.parseDouble(props.getProperty("sporeMaxHealthMultiplier", String.valueOf(sporeMaxHealthMultiplier)));
+                sporeMaxDamageMultiplier = Double.parseDouble(props.getProperty("sporeMaxDamageMultiplier", String.valueOf(sporeMaxDamageMultiplier)));
+                sporeHivemindSaturation = Integer.parseInt(props.getProperty("sporeHivemindSaturation", String.valueOf(sporeHivemindSaturation)));
+                sporeBiomassSaturation = Integer.parseInt(props.getProperty("sporeBiomassSaturation", String.valueOf(sporeBiomassSaturation)));
+                sporeHostSaturation = Integer.parseInt(props.getProperty("sporeHostSaturation", String.valueOf(sporeHostSaturation)));
+                sporePollutionSaturation = Double.parseDouble(props.getProperty("sporePollutionSaturation", String.valueOf(sporePollutionSaturation)));
+                sporeEvolutionWeightHivemind = Double.parseDouble(props.getProperty("sporeEvolutionWeightHivemind", String.valueOf(sporeEvolutionWeightHivemind)));
+                sporeEvolutionWeightBiomass = Double.parseDouble(props.getProperty("sporeEvolutionWeightBiomass", String.valueOf(sporeEvolutionWeightBiomass)));
+                sporeEvolutionWeightHost = Double.parseDouble(props.getProperty("sporeEvolutionWeightHost", String.valueOf(sporeEvolutionWeightHost)));
+                sporeEvolutionWeightPollution = Double.parseDouble(props.getProperty("sporeEvolutionWeightPollution", String.valueOf(sporeEvolutionWeightPollution)));
+                sporeEvolutionWeightVoltage = Double.parseDouble(props.getProperty("sporeEvolutionWeightVoltage", String.valueOf(sporeEvolutionWeightVoltage)));
+
+                // Spore 怪物增强参数
+                sporePollutionBonusDivisor = Double.parseDouble(props.getProperty("sporePollutionBonusDivisor", String.valueOf(sporePollutionBonusDivisor)));
+                sporeVoltageBonusPerTier = Double.parseDouble(props.getProperty("sporeVoltageBonusPerTier", String.valueOf(sporeVoltageBonusPerTier)));
+                sporeEvolutionBonusPerPhase = Double.parseDouble(props.getProperty("sporeEvolutionBonusPerPhase", String.valueOf(sporeEvolutionBonusPerPhase)));
+                sporeDamageBonusThreshold = Double.parseDouble(props.getProperty("sporeDamageBonusThreshold", String.valueOf(sporeDamageBonusThreshold)));
+                sporeDamageBonusDivisor = Double.parseDouble(props.getProperty("sporeDamageBonusDivisor", String.valueOf(sporeDamageBonusDivisor)));
+                sporeDamageBonusMultiplier = Double.parseDouble(props.getProperty("sporeDamageBonusMultiplier", String.valueOf(sporeDamageBonusMultiplier)));
+                sporeMaxVoltageTier = Double.parseDouble(props.getProperty("sporeMaxVoltageTier", String.valueOf(sporeMaxVoltageTier)));
+                sporeInfectionIntensityMultiplier = Double.parseDouble(props.getProperty("sporeInfectionIntensityMultiplier", String.valueOf(sporeInfectionIntensityMultiplier)));
+
+                // 污染系统核心配置
+                pollutionUpdateInterval = Integer.parseInt(props.getProperty("pollutionUpdateInterval", String.valueOf(pollutionUpdateInterval)));
+                pollutionEnvironmentScanInterval = Integer.parseInt(props.getProperty("pollutionEnvironmentScanInterval", String.valueOf(pollutionEnvironmentScanInterval)));
+                pollutionMachineScanRadius = Integer.parseInt(props.getProperty("pollutionMachineScanRadius", String.valueOf(pollutionMachineScanRadius)));
+                pollutionTierExponent = Double.parseDouble(props.getProperty("pollutionTierExponent", String.valueOf(pollutionTierExponent)));
+                pollutionTierMultiplier = Double.parseDouble(props.getProperty("pollutionTierMultiplier", String.valueOf(pollutionTierMultiplier)));
+                pollutionEnvAbsorptionFactor = Double.parseDouble(props.getProperty("pollutionEnvAbsorptionFactor", String.valueOf(pollutionEnvAbsorptionFactor)));
+                pollutionEnvAbsorptionMaxPercent = Double.parseDouble(props.getProperty("pollutionEnvAbsorptionMaxPercent", String.valueOf(pollutionEnvAbsorptionMaxPercent)));
+                pollutionDiffusionRate = Double.parseDouble(props.getProperty("pollutionDiffusionRate", String.valueOf(pollutionDiffusionRate)));
+                pollutionRemovalThreshold = Double.parseDouble(props.getProperty("pollutionRemovalThreshold", String.valueOf(pollutionRemovalThreshold)));
+                pollutionSporeFeedbackThreshold = Double.parseDouble(props.getProperty("pollutionSporeFeedbackThreshold", String.valueOf(pollutionSporeFeedbackThreshold)));
+
+                // 性能和调试配置
+                threatMaxGlobalEntities = Integer.parseInt(props.getProperty("threatMaxGlobalEntities", String.valueOf(threatMaxGlobalEntities)));
+                debugLogInterval = Integer.parseInt(props.getProperty("debugLogInterval", String.valueOf(debugLogInterval)));
+                threatSpawnRatePollutionDivisor = Double.parseDouble(props.getProperty("threatSpawnRatePollutionDivisor", String.valueOf(threatSpawnRatePollutionDivisor)));
+
+                // XaerosWorldMap集成配置
+                enablePollutionMapOverlay = Boolean.parseBoolean(props.getProperty("enablePollutionMapOverlay", String.valueOf(enablePollutionMapOverlay)));
+                pollutionOverlayAlpha = Double.parseDouble(props.getProperty("pollutionOverlayAlpha", String.valueOf(pollutionOverlayAlpha)));
+                showPollutionTooltip = Boolean.parseBoolean(props.getProperty("showPollutionTooltip", String.valueOf(showPollutionTooltip)));
 
                 // 应用预设（如果不是CUSTOM）
                 if (!difficultyPreset.equalsIgnoreCase("CUSTOM")) {
@@ -787,6 +1470,15 @@ public class TriAxisConfig {
         props.setProperty("emaAlpha", String.valueOf(emaAlpha));
         props.setProperty("pollutionDenominator", String.valueOf(pollutionDenominator));
 
+        // 乘法模型参数
+        props.setProperty("baseMin", String.valueOf(baseMin));
+        props.setProperty("baseMax", String.valueOf(baseMax));
+        props.setProperty("scaleExponent", String.valueOf(scaleExponent));
+        props.setProperty("scaleMultiplier", String.valueOf(scaleMultiplier));
+        props.setProperty("pressureMin", String.valueOf(pressureMin));
+        props.setProperty("pressureMax", String.valueOf(pressureMax));
+        props.setProperty("sigmoidShift", String.valueOf(sigmoidShift));
+
         // 工业加成
         props.setProperty("techWeight", String.valueOf(techWeight));
         props.setProperty("pollutionWeight", String.valueOf(pollutionWeight));
@@ -806,6 +1498,12 @@ public class TriAxisConfig {
         props.setProperty("attackMultFactor", String.valueOf(attackMultFactor));
         props.setProperty("speedMultFactor", String.valueOf(speedMultFactor));
         props.setProperty("armorMultFactor", String.valueOf(armorMultFactor));
+
+        // 属性上限
+        props.setProperty("maxHpMultiplier", String.valueOf(maxHpMultiplier));
+        props.setProperty("maxAttackMultiplier", String.valueOf(maxAttackMultiplier));
+        props.setProperty("maxSpeedMultiplier", String.valueOf(maxSpeedMultiplier));
+        props.setProperty("maxArmorMultiplier", String.valueOf(maxArmorMultiplier));
 
         // 电压阶段血量目标
         props.setProperty("ulvHpTarget", String.valueOf(ulvHpTarget));
@@ -830,10 +1528,42 @@ public class TriAxisConfig {
         props.setProperty("tierGrowthFactor", String.valueOf(tierGrowthFactor));
         props.setProperty("multiblockPollutionMultiplier", String.valueOf(multiblockPollutionMultiplier));
 
+        // 污染衰减和吸收
+        props.setProperty("naturalDecayRate", String.valueOf(naturalDecayRate));
+        props.setProperty("leafAbsorptionRate", String.valueOf(leafAbsorptionRate));
+        props.setProperty("waterAbsorptionRate", String.valueOf(waterAbsorptionRate));
+        props.setProperty("grassAbsorptionRate", String.valueOf(grassAbsorptionRate));
+
+        // 污染转化
+        props.setProperty("tempToPermanentThreshold", String.valueOf(tempToPermanentThreshold));
+        props.setProperty("tempToPermanentRate", String.valueOf(tempToPermanentRate));
+        props.setProperty("permanentToDifficultyRate", String.valueOf(permanentToDifficultyRate));
+
+        // 炮塔系统
+        props.setProperty("flamethrowerDirectDamage", String.valueOf(flamethrowerDirectDamage));
+        props.setProperty("flamethrowerGroundDamage", String.valueOf(flamethrowerGroundDamage));
+
         // 威胁触发等级配置
         props.setProperty("zombieAttackMinTier", String.valueOf(zombieAttackMinTier));
         props.setProperty("zombieSpawnMinTier", String.valueOf(zombieSpawnMinTier));
         props.setProperty("creeperSpawnMinTier", String.valueOf(creeperSpawnMinTier));
+
+        // 威胁系统详细配置
+        props.setProperty("hvZombieSpawnThreshold", String.valueOf(hvZombieSpawnThreshold));
+        props.setProperty("hvCreeperSpawnThreshold", String.valueOf(hvCreeperSpawnThreshold));
+        props.setProperty("chargedCreeperThreshold", String.valueOf(chargedCreeperThreshold));
+        props.setProperty("zombieSpawnChance", String.valueOf(zombieSpawnChance));
+        props.setProperty("creeperSpawnChance", String.valueOf(creeperSpawnChance));
+        props.setProperty("chargedCreeperChance", String.valueOf(chargedCreeperChance));
+
+        // 波次系统配置
+        props.setProperty("waveBaseSize", String.valueOf(waveBaseSize));
+        props.setProperty("waveCreeperBaseSize", String.valueOf(waveCreeperBaseSize));
+        props.setProperty("wavePollutionDivisor", String.valueOf(wavePollutionDivisor));
+        props.setProperty("waveTierDivisor", String.valueOf(waveTierDivisor));
+        props.setProperty("waveMaxSize", String.valueOf(waveMaxSize));
+        props.setProperty("waveCreeperMaxSize", String.valueOf(waveCreeperMaxSize));
+        props.setProperty("waveCreeperChance", String.valueOf(waveCreeperChance));
 
         // Hivemind接近系统
         props.setProperty("hivemindProximityRadius", String.valueOf(hivemindProximityRadius));
@@ -860,11 +1590,67 @@ public class TriAxisConfig {
         props.setProperty("machineTargetingChance", String.valueOf(machineTargetingChance));
         props.setProperty("enableVoltageTierScaling", String.valueOf(enableVoltageTierScaling));
 
+        // Save horde tier intensity multipliers array
+        StringBuilder tierMultipliersStr = new StringBuilder();
+        for (int i = 0; i < hordeTierIntensityMultipliers.length; i++) {
+            if (i > 0) tierMultipliersStr.append(",");
+            tierMultipliersStr.append(hordeTierIntensityMultipliers[i]);
+        }
+        props.setProperty("hordeTierIntensityMultipliers", tierMultipliersStr.toString());
+
         // 预设和调试
         props.setProperty("difficultyPreset", difficultyPreset);
         props.setProperty("enableDebugLines", String.valueOf(enableDebugLines));
         props.setProperty("enableDifficultyLogging", String.valueOf(enableDifficultyLogging));
         props.setProperty("enableSporeDebug", String.valueOf(enableSporeDebug));
+
+        // Spore 集成配置
+        props.setProperty("sporePollutionToBiomassRate", String.valueOf(sporePollutionToBiomassRate));
+        props.setProperty("sporeMaxBiomassPerProto", String.valueOf(sporeMaxBiomassPerProto));
+        props.setProperty("sporePollutionFeedbackThreshold", String.valueOf(sporePollutionFeedbackThreshold));
+        props.setProperty("sporeMaxHealthMultiplier", String.valueOf(sporeMaxHealthMultiplier));
+        props.setProperty("sporeMaxDamageMultiplier", String.valueOf(sporeMaxDamageMultiplier));
+        props.setProperty("sporeHivemindSaturation", String.valueOf(sporeHivemindSaturation));
+        props.setProperty("sporeBiomassSaturation", String.valueOf(sporeBiomassSaturation));
+        props.setProperty("sporeHostSaturation", String.valueOf(sporeHostSaturation));
+        props.setProperty("sporePollutionSaturation", String.valueOf(sporePollutionSaturation));
+        props.setProperty("sporeEvolutionWeightHivemind", String.valueOf(sporeEvolutionWeightHivemind));
+        props.setProperty("sporeEvolutionWeightBiomass", String.valueOf(sporeEvolutionWeightBiomass));
+        props.setProperty("sporeEvolutionWeightHost", String.valueOf(sporeEvolutionWeightHost));
+        props.setProperty("sporeEvolutionWeightPollution", String.valueOf(sporeEvolutionWeightPollution));
+        props.setProperty("sporeEvolutionWeightVoltage", String.valueOf(sporeEvolutionWeightVoltage));
+
+        // Spore 怪物增强参数
+        props.setProperty("sporePollutionBonusDivisor", String.valueOf(sporePollutionBonusDivisor));
+        props.setProperty("sporeVoltageBonusPerTier", String.valueOf(sporeVoltageBonusPerTier));
+        props.setProperty("sporeEvolutionBonusPerPhase", String.valueOf(sporeEvolutionBonusPerPhase));
+        props.setProperty("sporeDamageBonusThreshold", String.valueOf(sporeDamageBonusThreshold));
+        props.setProperty("sporeDamageBonusDivisor", String.valueOf(sporeDamageBonusDivisor));
+        props.setProperty("sporeDamageBonusMultiplier", String.valueOf(sporeDamageBonusMultiplier));
+        props.setProperty("sporeMaxVoltageTier", String.valueOf(sporeMaxVoltageTier));
+        props.setProperty("sporeInfectionIntensityMultiplier", String.valueOf(sporeInfectionIntensityMultiplier));
+
+        // 污染系统核心配置
+        props.setProperty("pollutionUpdateInterval", String.valueOf(pollutionUpdateInterval));
+        props.setProperty("pollutionEnvironmentScanInterval", String.valueOf(pollutionEnvironmentScanInterval));
+        props.setProperty("pollutionMachineScanRadius", String.valueOf(pollutionMachineScanRadius));
+        props.setProperty("pollutionTierExponent", String.valueOf(pollutionTierExponent));
+        props.setProperty("pollutionTierMultiplier", String.valueOf(pollutionTierMultiplier));
+        props.setProperty("pollutionEnvAbsorptionFactor", String.valueOf(pollutionEnvAbsorptionFactor));
+        props.setProperty("pollutionEnvAbsorptionMaxPercent", String.valueOf(pollutionEnvAbsorptionMaxPercent));
+        props.setProperty("pollutionDiffusionRate", String.valueOf(pollutionDiffusionRate));
+        props.setProperty("pollutionRemovalThreshold", String.valueOf(pollutionRemovalThreshold));
+        props.setProperty("pollutionSporeFeedbackThreshold", String.valueOf(pollutionSporeFeedbackThreshold));
+
+        // 性能和调试配置
+        props.setProperty("threatMaxGlobalEntities", String.valueOf(threatMaxGlobalEntities));
+        props.setProperty("debugLogInterval", String.valueOf(debugLogInterval));
+        props.setProperty("threatSpawnRatePollutionDivisor", String.valueOf(threatSpawnRatePollutionDivisor));
+
+        // XaerosWorldMap集成配置
+        props.setProperty("enablePollutionMapOverlay", String.valueOf(enablePollutionMapOverlay));
+        props.setProperty("pollutionOverlayAlpha", String.valueOf(pollutionOverlayAlpha));
+        props.setProperty("showPollutionTooltip", String.valueOf(showPollutionTooltip));
 
         try {
             if (!CONFIG_FILE.getParentFile().exists()) {
@@ -970,7 +1756,10 @@ public class TriAxisConfig {
 
                         enableVoltageTierScaling: 启用电压等级缩放 (true/false)
                           - 尸潮强度随玩家电压等级提升，默认true
-                          - 倍率: ULV=1.0x, LV=1.1x, MV=1.3x, HV=1.5x, EV=1.8x
+                        hordeTierIntensityMultipliers: 电压等级强度倍率数组 (10个值，逗号分隔)
+                          - 每个电压等级的尸潮强度倍率 (ULV到UHV)
+                          - 默认: 1.0,1.1,1.3,1.5,1.8,2.2,2.6,3.0,3.5,4.0
+                          - 对应: ULV=1.0x, LV=1.1x, MV=1.3x, HV=1.5x, EV=1.8x
                                  IV=2.2x, LuV=2.6x, ZPM=3.0x, UV=3.5x, UHV=4.0x
 
                         [时间曲线 Time Scaling] - 控制时间对难度的影响
@@ -984,6 +1773,44 @@ public class TriAxisConfig {
                         attackMultFactor: 伤害增幅倍率 (0.5-3.0)
                         speedMultFactor: 速度增幅倍率 (0.3-2.0)
                         armorMultFactor: 护甲增幅倍率 (0.5-2.0)
+
+                        [属性上限 Attribute Caps] - 防止怪物属性无限增长
+                        maxHpMultiplier: 最大血量倍率 (5.0-25.0)
+                          - 默认15.0，僵尸最高300HP
+                          - 防止后期怪物血量过高
+                        maxAttackMultiplier: 最大伤害倍率 (3.0-20.0)
+                          - 默认10.0，僵尸最高50伤害
+                          - 防止后期怪物伤害过高
+                        maxSpeedMultiplier: 最大速度倍率 (1.5-5.0)
+                          - 默认3.0
+                        maxArmorMultiplier: 最大护甲倍率 (2.0-10.0)
+                          - 默认5.0
+
+                        [污染衰减和吸收 Pollution Decay & Absorption]
+                        naturalDecayRate: 自然衰减速率 (/秒/区块) (0.01-0.1)
+                          - 默认0.03 (降低自0.05，让污染更容易积累)
+                        leafAbsorptionRate: 树叶吸收速率 (/叶/秒) (0.00001-0.0002)
+                          - 默认0.00005 (降低自0.0001)
+                          - 5000叶 = 0.25/秒吸收
+                        waterAbsorptionRate: 水方块吸收速率 (/水/秒) (0.00001-0.0002)
+                          - 默认0.00005
+                          - 1000水 = 0.05/秒吸收
+                        grassAbsorptionRate: 草方块吸收速率 (/草/秒) (0.00001-0.0001)
+                          - 默认0.00002
+
+                        [污染转化 Pollution Conversion]
+                        tempToPermanentThreshold: 临时转永久阈值 (100-300)
+                          - 默认200，超过此值开始转化
+                        tempToPermanentRate: 转化速率 (0.0001-0.01)
+                          - 默认0.001 (0.1%/秒)
+                        permanentToDifficultyRate: 永久污染转难度系数 (0.05-0.5)
+                          - 默认0.1
+
+                        [炮塔系统 Turret System]
+                        flamethrowerDirectDamage: 火焰炮塔直击伤害 (2.0-10.0)
+                          - 默认4.0 (降低自5.0，平衡防御强度)
+                        flamethrowerGroundDamage: 火焰炮塔地面伤害 (1.0-5.0)
+                          - 默认1.5 (降低自2.0)
 
                         [电压阶段血量目标 Voltage Tier HP Targets]
                         僵尸基础血量20，这些是目标倍率

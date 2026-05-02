@@ -18,7 +18,7 @@ version = mod_version
 group = maven_group
 archivesBaseName = archives_base_name
 
-java.toolchain.languageVersion = JavaLanguageVersion.of(17)
+java.toolchain.languageVersion = JavaLanguageVersion.of(21)
 
 minecraft {
     mappings channel: 'official', version: '1.20.1'
@@ -114,8 +114,8 @@ dependencies {
     // Place in mods_dev/ folder for compilation support
     compileOnly fg.deobf(fileTree(dir: 'mods_dev', include: 'EnhancedVisuals*.jar'))
 
-    // GregTech CEu integration
-    implementation fg.deobf("com.gregtechceu.gtceu:gtceu-1.20.1:${gtceu_version}") { transitive = false }
+    // GregTech CEu integration - using local JAR
+    implementation fg.deobf(files("mods_dev/gtceu-1.20.1-1.8.0.jar"))
     implementation fg.deobf("com.lowdragmc.ldlib:ldlib-forge-1.20.1:${ldlib_version}") { transitive = false }
     implementation fg.deobf("dev.toma.configuration:configuration-forge-1.20.1:${configuration_version}")
 

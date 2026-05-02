@@ -84,5 +84,7 @@
   "message.integratedindustrialcraft.turret_wrong_side": "不能在能量输入面放置炮塔！",
   "item_group.integratedindustrialcraft": "通用机械炮塔",
   "death.attack.integratedindustrialcraft.laser": "%1$s 被激光炮塔蒸发了",
-  "death.attack.integratedindustrialcraft.electric_fence": "%1$s 这个废物被电栅栏电死了"
+  "death.attack.integratedindustrialcraft.electric_fence": "%1$s 这个废物被电栅栏电死了",
+  "gui.iic.pollution_overlay_on": "污染叠加层：§a开启",
+  "gui.iic.pollution_overlay_off": "污染叠加层：§c关闭"
 }

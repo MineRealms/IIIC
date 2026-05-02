@@ -5,10 +5,12 @@
   "compatibilityLevel": "JAVA_17",
   "refmap": "integratedindustrialcraft.refmap.json",
   "mixins": [
+    "xaeromap.GuiMapAccessor"
   ],
   "client": [
     "enhancedvisuals.VisualManagerMixin",
-    "client.DebugScreenOverlayMixin"
+    "xaeromap.GuiMapMixin",
+    "xaeromap.GuiMapAccessor"
   ],
   "injectors": {
     "defaultRequire": 0

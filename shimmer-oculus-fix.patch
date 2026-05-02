@@ -1,0 +1,22 @@
+diff --git a/Common/src/main/java/com/lowdragmc/shimmer/core/mixins/LevelRendererMixin.java b/Common/src/main/java/com/lowdragmc/shimmer/core/mixins/LevelRendererMixin.java
+index 1234567..abcdefg 100644
+--- a/Common/src/main/java/com/lowdragmc/shimmer/core/mixins/LevelRendererMixin.java
++++ b/Common/src/main/java/com/lowdragmc/shimmer/core/mixins/LevelRendererMixin.java
+@@ -48,6 +48,8 @@ public abstract class LevelRendererMixin {
+                     value = "INVOKE",
+                     target = "Lnet/minecraft/client/renderer/DimensionSpecialEffects;constantAmbientLight()Z"))
+     private void injectRenderLevel(PoseStack poseStack, float pPartialTick, long pFinishNanoTime, boolean pRenderBlockOutline, Camera camera, GameRenderer pGameRenderer, LightTexture pLightTexture, Matrix4f projectionMatrix, CallbackInfo ci) {
++        // Null check for compatibility with Oculus/Embeddium
++        if (this.level == null) return;
+         this.level.getProfiler().popPush("block_bloom");
+         PostProcessing.getBlockBloom().renderBlockPost();
+     }
+@@ -82,6 +84,8 @@ public abstract class LevelRendererMixin {
+                     target = "Lnet/minecraft/client/renderer/LevelRenderer;checkPoseStack(Lcom/mojang/blaze3d/vertex/PoseStack;)V",
+                     ordinal = 1))
+     private void injectRenderLevelBloom(PoseStack poseStack, float pPartialTick, long pFinishNanoTime, boolean pRenderBlockOutline, Camera camera, GameRenderer pGameRenderer, LightTexture pLightTexture, Matrix4f projectionMatrix, CallbackInfo ci) {
++        // Null check for compatibility with Oculus/Embeddium
++        if (this.level == null) return;
+         ProfilerFiller profilerFiller = this.level.getProfiler();
+         for (PostProcessing postProcessing : PostProcessing.values()) {
+             postProcessing.renderEntityPost(profilerFiller);

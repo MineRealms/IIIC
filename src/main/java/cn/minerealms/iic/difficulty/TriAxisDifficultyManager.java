@@ -33,13 +33,16 @@ public class TriAxisDifficultyManager {
     }
 
     public static DifficultyState calculateLocalDifficulty(ServerLevel level, BlockPos center) {
-        // --- 1. 时间轴 (Time Axis - T) ---
+        // --- 1. 时间轴 (Time Axis - T) - 基础难度 ---
         long mcDays = level.getDayTime() / 24000L;
 
         double tRaw = Math.log1p(mcDays / TriAxisConfig.baseDays) / Math.log1p(TriAxisConfig.targetDays / TriAxisConfig.baseDays);
         double T = Mth.clamp(tRaw, 0.0, 1.0);
 
-        // --- 2. 科技轴 (Voltage Axis - V) ---
+        // Base difficulty: 0.5 ~ 2.0 (prevents AFK, but not dominant)
+        double Base = TriAxisConfig.baseMin + (TriAxisConfig.baseMax - TriAxisConfig.baseMin) * T;
+
+        // --- 2. 科技轴 (Voltage Axis - V) - 工业规模倍率 ---
         double V = 0.0;
         if (TriAxisConfig.hasGTCEu()) {
             int medianTier = MachineScanner.scanNearbyVoltageTierMedianSafely(level, center, TriAxisConfig.scanRadiusBlocks);
@@ -50,7 +53,11 @@ public class TriAxisDifficultyManager {
             V = T; // 降级处理
         }
 
-        // --- 3. Pollution Axis (P) ---
+        // Scale multiplier: 1.0 ~ 4.5 (exponential growth with voltage tier)
+        double tierValue = V * TriAxisConfig.getEffectiveMaxTier();
+        double Scale = 1.0 + Math.pow(tierValue, TriAxisConfig.scaleExponent) * TriAxisConfig.scaleMultiplier;
+
+        // --- 3. Pollution Axis (P) - 环境压力 ---
         // Always use temporary + permanent pollution, regardless of Spore
         double localPollution = PollutionManager.getTemporaryPollution(new net.minecraft.world.level.ChunkPos(center));
         double globalPollution = PollutionManager.getPermanentPollution();
@@ -61,16 +68,17 @@ public class TriAxisDifficultyManager {
         double newEma = (TriAxisConfig.emaAlpha * totalPollution) + ((1.0 - TriAxisConfig.emaAlpha) * currentEma);
         pollutionEmaCache.put(center, newEma);
 
-        // Normalize pollution to 0-1 range
-        // Use a more sensitive formula for low pollution values
-        double P = Math.min(1.0, newEma / 100.0); // Linear scaling: 100 pollution = 1.0
+        // Normalize pollution for sigmoid function
+        double P = newEma / TriAxisConfig.pollutionDenominator;
 
-        // --- 4. 融合计算总难度 (Total Difficulty - D) ---
-        double targetD = TriAxisConfig.globalMultiplier * (
-                TriAxisConfig.weightTime * T +
-                TriAxisConfig.weightVoltage * V +
-                TriAxisConfig.weightPollution * P
-        );
+        // Pressure multiplier: 1.0 ~ 4.0 (sigmoid curve for smooth transition)
+        double sigmoid = 1.0 / (1.0 + Math.exp(-P + TriAxisConfig.sigmoidShift));
+        double Pressure = TriAxisConfig.pressureMin + (TriAxisConfig.pressureMax - TriAxisConfig.pressureMin) * sigmoid;
+
+        // --- 4. 乘法融合 (Multiplicative Model) ---
+        // D = Base × Scale × Pressure × GlobalMultiplier
+        // Range: 0.5 ~ 36.0 (much wider than additive model's 0 ~ 4.4)
+        double targetD = Base * Scale * Pressure * TriAxisConfig.globalMultiplier;
 
         // --- 5. 迟滞与限速 (Hysteresis & Rate Limiting) ---
         double currentD = difficultyCache.getOrDefault(center, 0.0);
@@ -85,8 +93,8 @@ public class TriAxisDifficultyManager {
         // --- 6. Debug Logging - output every 5 seconds (100 ticks) ---
         if (IndustrialLogger.isDebugEnabled() && level.getGameTime() % 100 == 0) {
             IndustrialLogger.debugDifficulty(String.format(
-                    "TriAxis at %s | T: %.4f | V: %.4f | P: %.4f | D: %.4f | LocalPollution: %.2f | GlobalPollution: %.2f | TotalPollution: %.2f",
-                    center, T, V, P, finalD, localPollution, globalPollution, totalPollution));
+                    "TriAxis at %s | T: %.4f (Base: %.2f) | V: %.4f (Scale: %.2f) | P: %.4f (Pressure: %.2f) | D: %.4f | LocalPollution: %.2f | GlobalPollution: %.2f | TotalPollution: %.2f",
+                    center, T, Base, V, Scale, P, Pressure, finalD, localPollution, globalPollution, totalPollution));
         }
 
         return new DifficultyState(finalD, T, V, P);

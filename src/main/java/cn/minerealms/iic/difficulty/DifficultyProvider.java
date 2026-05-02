@@ -97,8 +97,8 @@ public class DifficultyProvider implements DifficultyGetter {
             }
         }
 
-        // Normalization: 100 pollution = 1.0 difficulty
-        totalDifficulty += (float) (acceleratedPollution / 100.0) * TriAxisConfig.localPollutionWeight;
+        // Normalization: use pollutionDenominator from config
+        totalDifficulty += (float) (acceleratedPollution / TriAxisConfig.pollutionDenominator) * TriAxisConfig.localPollutionWeight;
 
         // 3. Global permanent pollution (long-term accumulation)
         double globalPollution = PollutionManager.getPermanentPollution();

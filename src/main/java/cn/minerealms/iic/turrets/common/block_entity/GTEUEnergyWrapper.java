@@ -24,7 +24,7 @@ public class GTEUEnergyWrapper implements IEnergyContainer {
     }
 
     @Override
-    public long acceptEnergyFromNetwork(Direction side, long voltage, long amperage) {
+    public long acceptEnergyFromNetwork(Object capability, Direction side, long voltage, long amperage) {
         // GTEU -> FE: 1 GTEU = 4 FE (默认)
         long euToInsert = voltage * amperage;
         int feToInsert = FeCompat.toFe(euToInsert, getConversionRatio());

@@ -83,17 +83,29 @@ public class SporeIntegration {
 
     // ==================== Configuration ====================
 
-    /** Pollution to biomass conversion rate (configurable) */
-    public static double POLLUTION_TO_BIOMASS_RATE = 0.05;
+    /** Pollution to biomass conversion rate (configurable) - REDUCED from 0.05 to prevent Biomass explosion */
+    public static double POLLUTION_TO_BIOMASS_RATE = TriAxisConfig.sporePollutionToBiomassRate;
 
-    /** Pollution to evolution factor (configurable) */
-    public static double POLLUTION_EVOLUTION_FACTOR = 0.3;
+    /** Maximum Biomass per Proto (prevents infinite growth) */
+    public static int MAX_BIOMASS_PER_PROTO = TriAxisConfig.sporeMaxBiomassPerProto;
 
-    /** Voltage to evolution factor (configurable) */
-    public static double VOLTAGE_EVOLUTION_FACTOR = 0.2;
+    /** Pollution feedback trigger threshold */
+    public static double POLLUTION_FEEDBACK_THRESHOLD = TriAxisConfig.sporePollutionFeedbackThreshold;
+
+    /** Pollution to evolution factor (configurable) - INCREASED from 0.15 weight */
+    public static double POLLUTION_EVOLUTION_FACTOR = 1.0;  // Removed 0.3 multiplier
+
+    /** Voltage to evolution factor (configurable) - INCREASED from 0.10 weight */
+    public static double VOLTAGE_EVOLUTION_FACTOR = 1.0;  // Removed 0.2 multiplier
 
     /** Maximum evolution phase (0-10) */
     public static int MAX_EVOLUTION_PHASE = 10;
+
+    /** Maximum health multiplier for Spore mobs */
+    public static double MAX_HEALTH_MULTIPLIER = TriAxisConfig.sporeMaxHealthMultiplier;
+
+    /** Maximum damage multiplier for Spore mobs */
+    public static double MAX_DAMAGE_MULTIPLIER = TriAxisConfig.sporeMaxDamageMultiplier;
 
     // ==================== Initialization ====================
 
@@ -386,19 +398,21 @@ public class SporeIntegration {
         // Calculate average voltage tier (from player data)
         double avgVoltageTier = DifficultyManager.getAveragePlayerVoltageTier(level);
 
-        // Normalize factors (0.0 - 1.0)
-        double hivemindFactor = Math.min(1.0, hiveminds / 10.0);  // 10 Hiveminds = max
-        double biomassFactor = Math.min(1.0, biomass / 10000.0);  // 10k biomass = max
-        double hostFactor = Math.min(1.0, hosts / 500.0);         // 500 hosts = max
-        double pollutionFactor = Math.min(1.0, permanentPollution / 1000.0 * POLLUTION_EVOLUTION_FACTOR);
-        double voltageFactor = Math.min(1.0, avgVoltageTier / 9.0 * VOLTAGE_EVOLUTION_FACTOR);
+        // Normalize factors (0.0 - 1.0) - REBALANCED: Higher saturation thresholds
+        double hivemindFactor = Math.min(1.0, hiveminds / (double) TriAxisConfig.sporeHivemindSaturation);
+        double biomassFactor = Math.min(1.0, biomass / (double) TriAxisConfig.sporeBiomassSaturation);
+        double hostFactor = Math.min(1.0, hosts / (double) TriAxisConfig.sporeHostSaturation);
+        double pollutionFactor = Math.min(1.0, permanentPollution / TriAxisConfig.sporePollutionSaturation * POLLUTION_EVOLUTION_FACTOR);
+        double voltageFactor = Math.min(1.0, avgVoltageTier / TriAxisConfig.sporeMaxVoltageTier * VOLTAGE_EVOLUTION_FACTOR);
 
-        // Weighted average (Hiveminds and Biomass are most important)
-        double evolutionValue = (hivemindFactor * 0.35 +
-                                biomassFactor * 0.25 +
-                                hostFactor * 0.15 +
-                                pollutionFactor * 0.15 +
-                                voltageFactor * 0.10);
+        // Weighted average - REBALANCED: Pollution and Voltage more important
+        // Old: H:35% B:25% Ho:15% P:15% V:10%
+        // New: H:20% B:20% Ho:15% P:25% V:20%
+        double evolutionValue = (hivemindFactor * TriAxisConfig.sporeEvolutionWeightHivemind +
+                                biomassFactor * TriAxisConfig.sporeEvolutionWeightBiomass +
+                                hostFactor * TriAxisConfig.sporeEvolutionWeightHost +
+                                pollutionFactor * TriAxisConfig.sporeEvolutionWeightPollution +
+                                voltageFactor * TriAxisConfig.sporeEvolutionWeightVoltage);
 
         int phase = (int) Math.min(MAX_EVOLUTION_PHASE, evolutionValue * MAX_EVOLUTION_PHASE);
 
@@ -421,7 +435,7 @@ public class SporeIntegration {
      */
     public static float calculateInfectionIntensity(ServerLevel level) {
         int phase = calculateEvolutionPhase(level);
-        return (float) phase * 10f;  // Phase 0-10 -> 0-100%
+        return (float) phase * (float) TriAxisConfig.sporeInfectionIntensityMultiplier;  // Phase 0-10 -> 0-100% (configurable)
     }
 
     // ==================== Pollution Feedback System ====================
@@ -438,7 +452,7 @@ public class SporeIntegration {
      */
     public static void applyPollutionFeedback(ServerLevel level, double pollution) {
         if (!isSporeLoaded() || setBiomassMethod == null) return;
-        if (pollution < 100.0) return;  // Only apply feedback at high pollution
+        if (pollution < POLLUTION_FEEDBACK_THRESHOLD) return;  // Raised threshold from 100 to 150
 
         String levelKey = level.dimension().location().toString();
         long currentTick = level.getGameTime();
@@ -460,10 +474,23 @@ public class SporeIntegration {
         if (biomassIncrease <= 0) return;
 
         int updated = 0;
+        int capped = 0;
         for (Object proto : hiveminds) {
             try {
                 int currentBiomass = (int) getBiomassMethod.invoke(proto);
-                int newBiomass = currentBiomass + biomassIncrease;
+
+                // Check if already at cap
+                if (currentBiomass >= MAX_BIOMASS_PER_PROTO) {
+                    capped++;
+                    continue;
+                }
+
+                // Apply diminishing returns: growth slows as biomass approaches cap
+                double diminishingFactor = 1.0 - (currentBiomass / (double) MAX_BIOMASS_PER_PROTO);
+                int effectiveIncrease = (int) (biomassIncrease * diminishingFactor);
+
+                // Apply cap
+                int newBiomass = Math.min(MAX_BIOMASS_PER_PROTO, currentBiomass + effectiveIncrease);
                 setBiomassMethod.invoke(proto, newBiomass);
                 updated++;
             } catch (Exception e) {
@@ -473,8 +500,8 @@ public class SporeIntegration {
 
         if (TriAxisConfig.enableSporeDebug && updated > 0) {
             IndustrialLogger.debugSpore(String.format(
-                "[Spore] Pollution feedback: +%d biomass to %d Hiveminds (pollution: %.1f)",
-                biomassIncrease, updated, pollution
+                "[Spore] Pollution feedback: +%d biomass to %d Hiveminds (%d at cap) (pollution: %.1f)",
+                biomassIncrease, updated, capped, pollution
             ));
         }
     }
@@ -495,15 +522,16 @@ public class SporeIntegration {
 
         try {
             // Calculate buff multipliers
-            double pollutionBonus = Math.min(1.0, pollutionLevel / 200.0);  // Max 100% at 200 pollution
-            double voltageBonus = Math.max(0, localVoltageTier - 1) * 0.10;  // 10% per tier above ULV
+            double pollutionBonus = Math.min(1.0, pollutionLevel / TriAxisConfig.sporePollutionBonusDivisor);  // Max 100% at configured pollution
+            double voltageBonus = Math.max(0, localVoltageTier - 1) * TriAxisConfig.sporeVoltageBonusPerTier;  // Configurable % per tier above ULV
 
-            // Evolution bonus (new)
+            // Evolution bonus
             int evolutionPhase = calculateEvolutionPhase(level);
-            double evolutionBonus = evolutionPhase * 0.05;  // 5% per phase, max 50% at phase 10
+            double evolutionBonus = evolutionPhase * TriAxisConfig.sporeEvolutionBonusPerPhase;  // Configurable % per phase
 
-            // Total multiplier
+            // Total multiplier with HARD CAP to prevent stacking with ImprovedMobs
             double totalMultiplier = 1.0 + pollutionBonus + voltageBonus + evolutionBonus;
+            totalMultiplier = Math.min(MAX_HEALTH_MULTIPLIER, totalMultiplier);  // Cap at 3.0x
 
             // Apply health buff
             AttributeInstance health = mob.getAttribute(Attributes.MAX_HEALTH);
@@ -515,19 +543,22 @@ public class SporeIntegration {
 
                 if (TriAxisConfig.enableSporeDebug) {
                     IndustrialLogger.debugSpore(String.format(
-                        "[Spore] Buffed %s: HP %.1f -> %.1f (×%.2f) [P:%.0f%% V:%.0f%% E:%.0f%%]",
+                        "[Spore] Buffed %s: HP %.1f -> %.1f (×%.2f, capped at %.1fx) [P:%.0f%% V:%.0f%% E:%.0f%%]",
                         mob.getType().getDescriptionId(), oldHealth, newHealth, totalMultiplier,
-                        pollutionBonus * 100, voltageBonus * 100, evolutionBonus * 100
+                        MAX_HEALTH_MULTIPLIER, pollutionBonus * 100, voltageBonus * 100, evolutionBonus * 100
                     ));
                 }
             }
 
-            // Apply damage buff at high pollution
-            if (pollutionLevel > 100) {
+            // Apply damage buff at high pollution with REDUCED scaling and HARD CAP
+            if (pollutionLevel > TriAxisConfig.sporeDamageBonusThreshold) {
                 AttributeInstance damage = mob.getAttribute(Attributes.ATTACK_DAMAGE);
                 if (damage != null) {
-                    double damageBonus = (pollutionLevel / 100.0) * 0.3;  // 30% per 100 pollution
-                    damage.setBaseValue(damage.getBaseValue() * (1.0 + damageBonus));
+                    double oldDamage = damage.getBaseValue();
+                    // Configurable damage bonus calculation
+                    double damageBonus = (pollutionLevel / TriAxisConfig.sporeDamageBonusDivisor) * TriAxisConfig.sporeDamageBonusMultiplier;
+                    double damageMultiplier = Math.min(MAX_DAMAGE_MULTIPLIER, 1.0 + damageBonus);  // Cap at configured max
+                    damage.setBaseValue(oldDamage * damageMultiplier);
                 }
             }
 

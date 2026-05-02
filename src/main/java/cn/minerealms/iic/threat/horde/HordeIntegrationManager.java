@@ -6,6 +6,7 @@ import cn.minerealms.iic.industrial.IndustrialLogger;
 import cn.minerealms.iic.industrial.TriAxisConfig;
 import cn.minerealms.iic.integration.alexscaves.AlexsCavesIntegration;
 import cn.minerealms.iic.integration.gregtech.GTIntegration;
+import cn.minerealms.iic.integration.spore.SporeIntegration;
 import cn.minerealms.iic.pollution.PollutionManager;
 
 import net.minecraft.core.BlockPos;
@@ -32,55 +33,17 @@ import java.util.concurrent.ConcurrentHashMap;
  */
 public class HordeIntegrationManager {
 
-    // ==================== 配置参数 ====================
-
-    // 尸潮强度调整
-    public static boolean enableHordeIntegration = true;
-    public static double hordeIntensityMultiplier = 1.0;  // 全局尸潮强度倍率
-    public static double difficultyToIntensityFactor = 0.5;  // Difficulty 转换为尸潮强度的系数
-
-    // 污染触发尸潮
-    public static boolean enablePollutionTriggeredHordes = true;
-    public static double pollutionHordeTriggerThreshold = 150.0;  // 污染触发阈值
-    public static double pollutionHordeCheckInterval = 600.0;  // 检查间隔（tick）
-    public static double pollutionHordeTriggerChance = 0.05;  // 触发概率（每次检查）
-
-    // 小股袭扰配置
-    public static boolean enableSkirmishes = true;
-    public static double skirmishPollutionThreshold = 80.0;  // 小股袭扰污染阈值
-    public static double skirmishInterval = 1200.0;  // 小股袭扰间隔（tick）
-    public static int skirmishMinCount = 3;  // 最小生成数量
-    public static int skirmishMaxCount = 8;  // 最大生成数量
-
-    // 大尸潮配置
-    public static double majorHordePollutionThreshold = 200.0;  // 大尸潮污染阈值
-    public static double majorHordeMultiplier = 2.0;  // 大尸潮强度倍率
-
-    // 机器攻击配置
-    public static boolean enableMachineTargeting = true;
-    public static double machineTargetingRange = 32.0;  // 机器检测范围
-    public static double machineTargetingChance = 0.3;  // 僵尸攻击机器的概率
-
-    // 电压等级影响
-    public static boolean enableVoltageTierScaling = true;
-    public static double[] tierIntensityMultipliers = {
-        1.0,  // ULV (Tier 0)
-        1.1,  // LV  (Tier 1)
-        1.3,  // MV  (Tier 2) - 小股袭扰开始
-        1.5,  // HV  (Tier 3) - 中等威胁
-        1.8,  // EV  (Tier 4)
-        2.2,  // IV  (Tier 5) - 大尸潮开始
-        2.6,  // LuV (Tier 6)
-        3.0,  // ZPM (Tier 7)
-        3.5,  // UV  (Tier 8)
-        4.0   // UHV (Tier 9) - 极限挑战
-    };
+    // ==================== 配置参数（从 TriAxisConfig 读取）====================
+    // 所有配置参数现在从 TriAxisConfig 读取，确保配置文件修改生效
 
     // ==================== 运行时数据 ====================
 
+    // 玩家威胁等级缓存（基于 Spore Hivemind 距离）
+    private static final Map<UUID, Integer> playerThreatLevel = new ConcurrentHashMap<>();
+    private static final Map<UUID, Long> lastThreatUpdate = new ConcurrentHashMap<>();
+
     // 玩家尸潮冷却时间（防止频繁触发）
     private static final Map<UUID, Long> playerHordeCooldowns = new ConcurrentHashMap<>();
-    private static final long HORDE_COOLDOWN_TICKS = 6000;  // 5分钟冷却
 
     // 玩家小股袭扰冷却
     private static final Map<UUID, Long> playerSkirmishCooldowns = new ConcurrentHashMap<>();
@@ -91,25 +54,136 @@ public class HordeIntegrationManager {
     // 已标记为攻击机器的僵尸
     private static final Set<UUID> machineTargetingZombies = ConcurrentHashMap.newKeySet();
 
+    // ==================== 威胁等级系统（基于 Spore 距离）====================
+
+    /**
+     * 计算玩家的威胁等级（0-5）
+     * 基于最近 Hivemind 的距离
+     *
+     * @param player 玩家
+     * @return 威胁等级 0-5
+     */
+    public static int calculateThreatLevel(ServerPlayer player) {
+        if (!SporeIntegration.isSporeLoaded()) {
+            return 0;  // 无 Spore，无威胁
+        }
+
+        // 获取最近 Hivemind 距离
+        double distance = SporeIntegration.getNearestHivemindDistance(
+            (ServerLevel) player.level(), player.blockPosition());
+
+        if (distance == Double.MAX_VALUE) {
+            return 0;  // 无 Hivemind
+        }
+
+        // 距离转威胁等级（使用配置参数）
+        if (distance < TriAxisConfig.hordeThreatLevel5Distance) return 5;   // 紧急
+        if (distance < TriAxisConfig.hordeThreatLevel4Distance) return 4;   // 严重
+        if (distance < TriAxisConfig.hordeThreatLevel3Distance) return 3;   // 危险
+        if (distance < TriAxisConfig.hordeThreatLevel2Distance) return 2;   // 紧张
+        if (distance < TriAxisConfig.hordeThreatLevel1Distance) return 1;   // 警戒
+        return 0;  // 安全
+    }
+
+    /**
+     * 获取玩家的威胁等级（带缓存）
+     *
+     * @param player 玩家
+     * @param currentTick 当前 tick
+     * @return 威胁等级 0-5
+     */
+    public static int getThreatLevel(ServerPlayer player, long currentTick) {
+        UUID playerId = player.getUUID();
+        Long lastUpdate = lastThreatUpdate.get(playerId);
+
+        // 检查是否需要更新（使用配置参数）
+        if (lastUpdate == null || currentTick - lastUpdate >= TriAxisConfig.hordeThreatUpdateInterval) {
+            int newLevel = calculateThreatLevel(player);
+            playerThreatLevel.put(playerId, newLevel);
+            lastThreatUpdate.put(playerId, currentTick);
+            return newLevel;
+        }
+
+        return playerThreatLevel.getOrDefault(playerId, 0);
+    }
+
+    /**
+     * 计算基于威胁等级的 Horde 间隔（ticks）
+     *
+     * @param threatLevel 威胁等级 0-5
+     * @return Horde 检查间隔（ticks）
+     */
+    public static long calculateHordeInterval(int threatLevel) {
+        return switch (threatLevel) {
+            case 0 -> Long.MAX_VALUE;  // 不触发
+            case 1 -> 3600;  // 3分钟
+            case 2 -> 1800;  // 1.5分钟
+            case 3 -> 900;   // 45秒
+            case 4 -> 600;   // 30秒
+            case 5 -> 300;   // 15秒
+            default -> Long.MAX_VALUE;
+        };
+    }
+
+    /**
+     * 计算基于威胁等级的 Horde 强度倍率
+     *
+     * @param threatLevel 威胁等级 0-5
+     * @param pollution 当前污染
+     * @param voltageTier 电压等级
+     * @return 强度倍率
+     */
+    public static double calculateHordeIntensity(int threatLevel, double pollution, int voltageTier) {
+        // 基础倍率（威胁等级）
+        double baseMult = switch (threatLevel) {
+            case 1 -> 1.0;
+            case 2 -> 1.3;
+            case 3 -> 1.7;
+            case 4 -> 2.2;
+            case 5 -> 3.0;
+            default -> 1.0;
+        };
+
+        // 污染加成（最多 +50%）
+        double pollutionBonus = Math.min(0.5, pollution / 400.0);
+
+        // 电压加成
+        double tierMult = getTierIntensityMultiplier(voltageTier);
+
+        return baseMult * (1.0 + pollutionBonus) * tierMult;
+    }
+
+    // ==================== 主更新方法 ====================
+
     /**
      * 主更新方法 - 每 tick 调用
      */
     public static void tick(ServerLevel level) {
-        if (!enableHordeIntegration || !HordeManager.isHordesLoaded()) {
+        if (!TriAxisConfig.enableHordeIntegration || !HordeManager.isHordesLoaded()) {
             return;
         }
 
         long currentTick = level.getGameTime();
 
-        // 污染触发尸潮检查
-        if (enablePollutionTriggeredHordes &&
-            currentTick - lastPollutionCheckTick >= pollutionHordeCheckInterval) {
+        // 降低检查频率：每5 tick检查一次（从20次/秒降到4次/秒）
+        if (currentTick % 5 != 0) {
+            return;
+        }
+
+        // 基于 Spore 距离的威胁等级检查（新系统）
+        if (SporeIntegration.isSporeLoaded()) {
+            checkThreatLevelHordes(level, currentTick);
+        }
+
+        // 污染触发尸潮检查（旧系统，作为备用）
+        if (TriAxisConfig.enablePollutionTriggeredHordes &&
+            currentTick - lastPollutionCheckTick >= TriAxisConfig.pollutionHordeCheckInterval) {
             lastPollutionCheckTick = currentTick;
             checkPollutionTriggeredHordes(level);
         }
 
         // 小股袭扰检查
-        if (enableSkirmishes) {
+        if (TriAxisConfig.enableSkirmishes) {
             checkSkirmishes(level, currentTick);
         }
 
@@ -117,8 +191,56 @@ public class HordeIntegrationManager {
         updateHordeIntensity(level);
 
         // 处理机器攻击
-        if (enableMachineTargeting) {
+        if (TriAxisConfig.enableMachineTargeting) {
             updateMachineTargeting(level);
+        }
+    }
+
+    /**
+     * 检查基于威胁等级的 Horde 触发（新系统）
+     */
+    private static void checkThreatLevelHordes(ServerLevel level, long currentTick) {
+        for (ServerPlayer player : level.players()) {
+            UUID playerId = player.getUUID();
+
+            // 获取威胁等级
+            int threatLevel = getThreatLevel(player, currentTick);
+            if (threatLevel == 0) {
+                continue;  // 安全，不触发
+            }
+
+            // 检查冷却
+            Long lastTrigger = playerHordeCooldowns.get(playerId);
+            if (lastTrigger == null) {
+                playerHordeCooldowns.put(playerId, currentTick);
+                continue;
+            }
+
+            // 计算动态间隔
+            long interval = calculateHordeInterval(threatLevel);
+            long elapsed = currentTick - lastTrigger;
+
+            // 时间到了就触发（确定性触发）
+            if (elapsed >= interval) {
+                // 获取污染和电压
+                ChunkPos chunkPos = player.chunkPosition();
+                double pollution = PollutionManager.getTemporaryPollution(chunkPos);
+                int voltageTier = getPlayerVoltageTier(player);
+
+                // 计算强度
+                double intensity = calculateHordeIntensity(threatLevel, pollution, voltageTier);
+
+                // 触发 Horde
+                boolean success = HordeManager.startHorde(player, (int)(intensity * 10), false);
+
+                if (success) {
+                    playerHordeCooldowns.put(playerId, currentTick);
+
+                    IndustrialLogger.debugPollution(String.format(
+                        "[Horde] Threat-based horde triggered for %s | ThreatLevel: %d | Intensity: %.2f | Pollution: %.1f | Tier: %d",
+                        player.getName().getString(), threatLevel, intensity, pollution, voltageTier));
+                }
+            }
         }
     }
 
@@ -127,8 +249,8 @@ public class HordeIntegrationManager {
      */
     private static void checkPollutionTriggeredHordes(ServerLevel level) {
         for (ServerPlayer player : level.players()) {
-            // 检查冷却
-            if (isOnCooldown(player, playerHordeCooldowns, HORDE_COOLDOWN_TICKS)) {
+            // 检查冷却（使用配置参数）
+            if (isOnCooldown(player, playerHordeCooldowns, TriAxisConfig.hordePlayerCooldown)) {
                 continue;
             }
 
@@ -137,12 +259,12 @@ public class HordeIntegrationManager {
             double pollution = PollutionManager.getTemporaryPollution(chunkPos);
 
             // 检查是否达到触发阈值
-            if (pollution < pollutionHordeTriggerThreshold) {
+            if (pollution < TriAxisConfig.pollutionHordeTriggerThreshold) {
                 continue;
             }
 
             // 概率触发
-            if (level.random.nextDouble() > pollutionHordeTriggerChance) {
+            if (level.random.nextDouble() > TriAxisConfig.pollutionHordeTriggerChance) {
                 continue;
             }
 
@@ -158,8 +280,8 @@ public class HordeIntegrationManager {
         ServerLevel level = player.serverLevel();
 
         // 计算尸潮强度
-        boolean isMajorHorde = pollution >= majorHordePollutionThreshold;
-        double intensityMultiplier = isMajorHorde ? majorHordeMultiplier : 1.0;
+        boolean isMajorHorde = pollution >= TriAxisConfig.majorHordePollutionThreshold;
+        double intensityMultiplier = isMajorHorde ? TriAxisConfig.majorHordeMultiplier : 1.0;
 
         // 获取玩家电压等级
         int voltageTier = getPlayerVoltageTier(player);
@@ -211,7 +333,7 @@ public class HordeIntegrationManager {
     private static void checkSkirmishes(ServerLevel level, long currentTick) {
         for (ServerPlayer player : level.players()) {
             // 检查冷却
-            if (isOnCooldown(player, playerSkirmishCooldowns, (long) skirmishInterval)) {
+            if (isOnCooldown(player, playerSkirmishCooldowns, (long) TriAxisConfig.skirmishInterval)) {
                 continue;
             }
 
@@ -220,7 +342,7 @@ public class HordeIntegrationManager {
             double pollution = PollutionManager.getTemporaryPollution(chunkPos);
 
             // 检查阈值
-            if (pollution < skirmishPollutionThreshold) {
+            if (pollution < TriAxisConfig.skirmishPollutionThreshold) {
                 continue;
             }
 
@@ -245,8 +367,8 @@ public class HordeIntegrationManager {
         double pollutionFactor = Math.min(pollution / 150.0, 2.0);
         double tierFactor = getTierIntensityMultiplier(voltageTier);
 
-        int count = (int) (skirmishMinCount +
-            (skirmishMaxCount - skirmishMinCount) * pollutionFactor * tierFactor);
+        int count = (int) (TriAxisConfig.skirmishMinCount +
+            (TriAxisConfig.skirmishMaxCount - TriAxisConfig.skirmishMinCount) * pollutionFactor * tierFactor);
 
         // 生成一波
         boolean success = HordeManager.spawnWave(player, count);
@@ -280,7 +402,7 @@ public class HordeIntegrationManager {
             float difficulty = DifficultyManager.getDifficultyFor(player);
 
             // 计算强度调整
-            double intensityBonus = difficulty * difficultyToIntensityFactor * hordeIntensityMultiplier;
+            double intensityBonus = difficulty * TriAxisConfig.difficultyToIntensityFactor * TriAxisConfig.hordeIntensityMultiplier;
 
             // 调整尸潮实体属性
             adjustHordeEntities(player, intensityBonus);
@@ -307,7 +429,7 @@ public class HordeIntegrationManager {
             // 只需要确保 difficulty 值正确传递即可
 
             // 如果启用机器攻击，添加机器目标AI
-            if (enableMachineTargeting && entity instanceof net.minecraft.world.entity.monster.Zombie) {
+            if (TriAxisConfig.enableMachineTargeting && entity instanceof net.minecraft.world.entity.monster.Zombie) {
                 addMachineTargetingAI(entity, player);
             }
         }
@@ -318,7 +440,7 @@ public class HordeIntegrationManager {
      */
     private static void addMachineTargetingAI(Mob zombie, ServerPlayer player) {
         // 概率决定是否攻击机器
-        if (zombie.level().random.nextDouble() > machineTargetingChance) {
+        if (zombie.level().random.nextDouble() > TriAxisConfig.machineTargetingChance) {
             return;
         }
 
@@ -377,7 +499,7 @@ public class HordeIntegrationManager {
         BlockPos zombiePos = zombie.blockPosition();
         ServerLevel level = (ServerLevel) zombie.level();
 
-        double range = machineTargetingRange;
+        double range = TriAxisConfig.machineTargetingRange;
         AABB searchBox = new AABB(zombiePos).inflate(range);
 
         BlockEntity nearest = null;
@@ -429,16 +551,16 @@ public class HordeIntegrationManager {
      * 获取电压等级强度倍率
      */
     private static double getTierIntensityMultiplier(int tier) {
-        if (!enableVoltageTierScaling) {
+        if (!TriAxisConfig.enableVoltageTierScaling) {
             return 1.0;
         }
 
-        if (tier < 0 || tier >= tierIntensityMultipliers.length) {
+        if (tier < 0 || tier >= TriAxisConfig.hordeTierIntensityMultipliers.length) {
             // 超出范围，使用最高等级的倍率
-            return tierIntensityMultipliers[tierIntensityMultipliers.length - 1];
+            return TriAxisConfig.hordeTierIntensityMultipliers[TriAxisConfig.hordeTierIntensityMultipliers.length - 1];
         }
 
-        return tierIntensityMultipliers[tier];
+        return TriAxisConfig.hordeTierIntensityMultipliers[tier];
     }
 
     /**
@@ -467,7 +589,7 @@ public class HordeIntegrationManager {
     public static String getDebugInfo(ServerPlayer player) {
         StringBuilder sb = new StringBuilder();
         sb.append("[IIC-Hordes Integration]\n");
-        sb.append("  Enabled: ").append(enableHordeIntegration).append("\n");
+        sb.append("  Enabled: ").append(TriAxisConfig.enableHordeIntegration).append("\n");
         sb.append("  Hordes Loaded: ").append(HordeManager.isHordesLoaded()).append("\n");
 
         if (HordeManager.isHordesLoaded()) {
@@ -485,10 +607,25 @@ public class HordeIntegrationManager {
             sb.append("  Voltage Tier: ").append(voltageTier).append("\n");
             sb.append("  Tier Multiplier: ").append(String.format("%.2f", getTierIntensityMultiplier(voltageTier))).append("\n");
 
-            boolean onCooldown = isOnCooldown(player, playerHordeCooldowns, HORDE_COOLDOWN_TICKS);
+            // 威胁等级信息（新增）
+            if (SporeIntegration.isSporeLoaded()) {
+                int threatLevel = getThreatLevel(player, player.level().getGameTime());
+                double distance = SporeIntegration.getNearestHivemindDistance(
+                    (ServerLevel) player.level(), player.blockPosition());
+                long interval = calculateHordeInterval(threatLevel);
+                double intensity = calculateHordeIntensity(threatLevel, pollution, voltageTier);
+
+                sb.append("\n[Threat Level System]\n");
+                sb.append("  Threat Level: ").append(threatLevel).append(" / 5\n");
+                sb.append("  Nearest Hivemind: ").append(distance == Double.MAX_VALUE ? "None" : String.format("%.1f blocks", distance)).append("\n");
+                sb.append("  Horde Interval: ").append(interval == Long.MAX_VALUE ? "Never" : String.format("%d ticks (%.1fs)", interval, interval / 20.0)).append("\n");
+                sb.append("  Horde Intensity: ").append(String.format("%.2fx", intensity)).append("\n");
+            }
+
+            boolean onCooldown = isOnCooldown(player, playerHordeCooldowns, TriAxisConfig.hordePlayerCooldown);
             sb.append("  Horde Cooldown: ").append(onCooldown ? "YES" : "NO").append("\n");
 
-            boolean onSkirmishCooldown = isOnCooldown(player, playerSkirmishCooldowns, (long) skirmishInterval);
+            boolean onSkirmishCooldown = isOnCooldown(player, playerSkirmishCooldowns, (long) TriAxisConfig.skirmishInterval);
             sb.append("  Skirmish Cooldown: ").append(onSkirmishCooldown ? "YES" : "NO").append("\n");
 
             sb.append("  Machine Targeting Zombies: ").append(machineTargetingZombies.size());
@@ -503,6 +640,8 @@ public class HordeIntegrationManager {
     public static void resetCooldowns() {
         playerHordeCooldowns.clear();
         playerSkirmishCooldowns.clear();
+        playerThreatLevel.clear();
+        lastThreatUpdate.clear();
         machineTargetingZombies.clear();
     }
 

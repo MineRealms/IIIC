@@ -1,5 +1,6 @@
 package cn.minerealms.iic.pollution;
 
+import cn.minerealms.iic.api.PollutionOverlayAPI;
 import cn.minerealms.iic.industrial.IndustrialLogger;
 import cn.minerealms.iic.industrial.TriAxisConfig;
 import cn.minerealms.iic.integration.gregtech.GTIntegration;
@@ -74,16 +75,12 @@ public class PollutionManager {
     /** Scan counter for staggered processing */
     private static int tickCounter = 0;
 
-    // === Configuration Parameters (adjustable via TriAxisConfig) ===
-
-    /** Threshold for converting temporary pollution to permanent pollution */
-    public static double TEMP_TO_PERM_THRESHOLD = 200.0;
-
-    /** Conversion rate for temporary to permanent pollution (per second, proportional) */
-    public static double TEMP_TO_PERM_RATE = 0.0005;
-
-    /** Conversion rate for permanent pollution to difficulty */
-    public static double PERM_TO_DIFFICULTY_RATE = 0.1;
+    // Configuration parameters are loaded from TriAxisConfig:
+    // - tempToPermanentThreshold: Threshold for converting temporary to permanent pollution
+    // - tempToPermanentRate: Conversion rate (per second)
+    // - permanentToDifficultyRate: Threshold for converting permanent pollution to difficulty
+    // - naturalDecayRate: Natural pollution decay rate per chunk per second
+    // - leafAbsorptionRate, waterAbsorptionRate, grassAbsorptionRate: Environmental absorption rates
 
     /**
      * Adds to the global permanent pollution value.
@@ -161,13 +158,13 @@ public class PollutionManager {
     public static void tick(ServerLevel level) {
         tickCounter++;
 
-        // 1 second pollution & scan
-        if (tickCounter % 20 == 0) {
+        // Pollution update interval (configurable)
+        if (tickCounter % TriAxisConfig.pollutionUpdateInterval == 0) {
             processPollutionDecayAndScanning(level);
         }
 
-        // 5 minute environment scan (already in thread)
-        if (tickCounter % 6000 == 0) {
+        // Environment scan interval (configurable)
+        if (tickCounter % TriAxisConfig.pollutionEnvironmentScanInterval == 0) {
             updateEnvironmentalCache(level);
         }
     }
@@ -189,7 +186,7 @@ public class PollutionManager {
         Map<ChunkPos, Double> newPollutionThisSec = new HashMap<>();
         
         CompletableFuture.runAsync(() -> {
-            int scanRadius = 4;
+            int scanRadius = TriAxisConfig.pollutionMachineScanRadius;
             Set<ChunkPos> scannedChunks = new HashSet<>();
             
             for (net.minecraft.server.level.ServerPlayer player : level.players()) {
@@ -203,13 +200,13 @@ public class PollutionManager {
                                 if (GTIntegration.isGTMachine(be)) {
                                     if (GTIntegration.hasEnergyOrActive(be)) {
                                         int tier = GTIntegration.getVoltageTier(be);
-                                        // Exponential pollution generation (Factorio style)
+                                        // Exponential pollution generation (Factorio style, configurable)
                                         // tier 0 (ULV) = 0.01/s, tier 2 (MV) = 0.035/s, tier 4 (EV) = 0.087/s, tier 6 (IV) = 0.21/s
-                                        double pollutionValue = 0.01 * (1 + Math.pow(tier, 1.3) * 0.25);
+                                        double pollutionValue = 0.01 * (1 + Math.pow(tier, TriAxisConfig.pollutionTierExponent) * TriAxisConfig.pollutionTierMultiplier);
 
-                                        // Multiblock structures produce more pollution (3x)
+                                        // Multiblock structures produce more pollution (configurable multiplier)
                                         if (GTIntegration.isMultiblock(be)) {
-                                            pollutionValue *= 3.0;
+                                            pollutionValue *= TriAxisConfig.multiblockPollutionMultiplier;
                                         }
 
                                         ChunkPos cPos = new ChunkPos(be.getBlockPos());
@@ -263,32 +260,44 @@ public class PollutionManager {
                 double current = temporaryPollution.get(cPos);
                 totalTempPollution += current;
 
-                // Proportional conversion to permanent pollution (always active)
-                double converted = current * TEMP_TO_PERM_RATE;
-                addPermanentPollution(converted);
-
-                if (IndustrialLogger.isDebugEnabled() && level.getGameTime() % 100 == 0) {
-                    IndustrialLogger.debugPollution(String.format(
-                            "Chunk %s: Temp pollution %.2f -> Converting %.4f to permanent",
-                            cPos, current, converted));
+                // Threshold-based conversion to permanent pollution
+                // Only pollution above threshold converts (prevents low pollution from converting)
+                double converted = 0.0;
+                if (current > TriAxisConfig.tempToPermanentThreshold) {
+                    double excess = current - TriAxisConfig.tempToPermanentThreshold;
+                    converted = excess * TriAxisConfig.tempToPermanentRate;
+                    addPermanentPollution(converted);
                 }
 
-                // Proportional decay (0.2% per second)
-                double reduction = current * 0.002;
-                // Environmental absorption with cap (max 10% of current pollution)
-                double envReduction = getSurroundingEnvironmentalReduction(cPos);
-                double envCap = current * 0.1;
-                reduction += Math.min(envCap, envReduction);
+                if (IndustrialLogger.isDebugEnabled() && level.getGameTime() % 100 == 0 && converted > 0) {
+                    IndustrialLogger.debugPollution(String.format(
+                            "Chunk %s: Temp pollution %.2f (excess: %.2f) -> Converting %.4f to permanent",
+                            cPos, current, current - TriAxisConfig.tempToPermanentThreshold, converted));
+                }
+
+                // Natural decay: proportional to current pollution (0.2% per second by default)
+                double naturalDecay = current * TriAxisConfig.naturalDecayRate;
+
+                // Environmental absorption with absolute cap (configurable)
+                double envScore = getSurroundingEnvironmentalReduction(cPos);
+                // Cap: min(envScore * factor, current * maxPercent)
+                // This prevents "plant forest = invincible" while still making environment useful
+                double envAbsorb = Math.min(envScore * TriAxisConfig.pollutionEnvAbsorptionFactor, current * TriAxisConfig.pollutionEnvAbsorptionMaxPercent);
+
+                double reduction = naturalDecay + envAbsorb;
                 double added = newPollutionThisSec.getOrDefault(cPos, 0.0);
                 double nextVal = Math.max(0.0, current - reduction + added);
 
-                // Pollution diffusion to neighbors (Factorio style - creates pollution clouds)
-                nextVal = applyPollutionDiffusion(temporaryPollution, cPos, nextVal, 0.15);
+                // Pollution diffusion to neighbors (Factorio style - creates pollution clouds, configurable)
+                nextVal = applyPollutionDiffusion(temporaryPollution, cPos, nextVal, TriAxisConfig.pollutionDiffusionRate);
 
-                if (nextVal <= 0.001) {
+                // Remove low pollution chunks (performance optimization, configurable threshold)
+                if (nextVal <= TriAxisConfig.pollutionRemovalThreshold) {
                     temporaryPollution.remove(cPos);
+                    PollutionOverlayAPI.updatePollutionCache(cPos, 0.0); // Clear from overlay cache
                 } else {
                     temporaryPollution.put(cPos, nextVal);
+                    PollutionOverlayAPI.updatePollutionCache(cPos, nextVal); // Update overlay cache
 
                     // Check and trigger threat mechanisms (based on voltage tier and pollution)
                     double avgTier = ThreatManager.getChunkAverageVoltageTier(level, cPos);
@@ -300,11 +309,12 @@ public class PollutionManager {
             for (Map.Entry<ChunkPos, Double> entry : newPollutionThisSec.entrySet()) {
                 if (!temporaryPollution.containsKey(entry.getKey())) {
                     temporaryPollution.put(entry.getKey(), entry.getValue());
+                    PollutionOverlayAPI.updatePollutionCache(entry.getKey(), entry.getValue()); // Update overlay cache
                 }
             }
 
             // When permanent pollution accumulates to a certain level, increase global difficulty
-            if (permanentPollution >= PERM_TO_DIFFICULTY_RATE) {
+            if (permanentPollution >= TriAxisConfig.permanentToDifficultyRate) {
                 io.github.flemmli97.improvedmobs.difficulty.DifficultyData diffData =
                         io.github.flemmli97.improvedmobs.difficulty.DifficultyData.get(level.getServer());
                 diffData.addDifficulty((float)permanentPollution, level.getServer());
@@ -318,9 +328,9 @@ public class PollutionManager {
                 permanentPollution = 0.0;
             }
 
-            // Spore pollution feedback - accelerate Hivemind growth based on pollution
+            // Spore pollution feedback - accelerate Hivemind growth based on pollution (configurable threshold)
             // Must be called on main thread (modifies entity data)
-            if (SporeIntegration.isSporeLoaded() && totalTempPollution > 100.0) {
+            if (SporeIntegration.isSporeLoaded() && totalTempPollution > TriAxisConfig.pollutionSporeFeedbackThreshold) {
                 final double pollutionForFeedback = totalTempPollution;  // Make effectively final
                 level.getServer().execute(() -> {
                     SporeIntegration.applyPollutionFeedback(level, pollutionForFeedback);
@@ -396,11 +406,11 @@ public class PollutionManager {
      * Ultra-fast chunk scanning using ChunkSection's two-layer loop instead of three-layer coordinate loop.
      * This greatly optimizes performance!
      *
-     * <p>Pollution absorption formula:
+     * <p>Pollution absorption formula (configurable via TriAxisConfig):
      * <ul>
-     *   <li>Each leaf: 0.0001 (trees are the main purification source)</li>
-     *   <li>Each water block: 0.00005 (water purification is weaker)</li>
-     *   <li>Each grass/flower: 0.0001 (grass purification equals leaves)</li>
+     *   <li>Each leaf: leafAbsorptionRate (default 0.00005, trees are the main purification source)</li>
+     *   <li>Each water block: waterAbsorptionRate (default 0.00005, water purification)</li>
+     *   <li>Each grass/flower: grassAbsorptionRate (default 0.00002, grass purification)</li>
      * </ul>
      *
      * @param chunk The chunk to scan
@@ -437,7 +447,9 @@ public class PollutionManager {
             }
         }
 
-        return (leafCount * 0.0001) + (waterCount * 0.00005) + (grassCount * 0.0001);
+        return (leafCount * TriAxisConfig.leafAbsorptionRate) +
+               (waterCount * TriAxisConfig.waterAbsorptionRate) +
+               (grassCount * TriAxisConfig.grassAbsorptionRate);
     }
 
     /**

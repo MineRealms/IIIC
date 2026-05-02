@@ -64,22 +64,22 @@ public class MekanismTurretsConfig {
 
 
         basicLaserTurretCooldown = BUILDER.comment("Cooldown of the Basic Laser Turret").defineInRange("basicLaserTurretCooldown", 50, 0, Integer.MAX_VALUE);
-        basicLaserTurretDamage = BUILDER.comment("Damage of the Basic Laser Turret").defineInRange("basicLaserTurretDamage", 1F, 0F, Float.MAX_VALUE);
+        basicLaserTurretDamage = BUILDER.comment("Damage of the Basic Laser Turret").defineInRange("basicLaserTurretDamage", 1.5, 0.0, Double.MAX_VALUE);
         basicLaserTurretEnergyCapacity = BUILDER.comment("Energy Capacity of the Basic Laser Turret").defineInRange("basicLaserTurretEnergyCapacity", 10000, 0, Integer.MAX_VALUE);
         basicLaserTurretRange = BUILDER.comment("Range of the Basic Laser Turret").defineInRange("basicLaserTurretRange", 15D, 0D, 1000);
 
         advancedLaserTurretCooldown = BUILDER.comment("Cooldown of the Advanced Laser Turret").defineInRange("advancedLaserTurretCooldown", 40, 0, Integer.MAX_VALUE);
-        advancedLaserTurretDamage = BUILDER.comment("Damage of the Advanced Laser Turret").defineInRange("advancedLaserTurretDamage", 2F, 0F, Integer.MAX_VALUE);
+        advancedLaserTurretDamage = BUILDER.comment("Damage of the Advanced Laser Turret").defineInRange("advancedLaserTurretDamage", 2.5, 0.0, Double.MAX_VALUE);
         advancedLaserTurretEnergyCapacity = BUILDER.comment("Energy Capacity of the Advanced Laser Turret").defineInRange("advancedLaserTurretEnergyCapacity", 40000, 0, Integer.MAX_VALUE);
         advancedLaserTurretRange = BUILDER.comment("Range of the Advanced Laser Turret").defineInRange("advancedLaserTurretRange", 25D, 0D, 1000);
 
         eliteLaserTurretCooldown = BUILDER.comment("Cooldown of the Elite Laser Turret").defineInRange("eliteLaserTurretCooldown", 30, 0, Integer.MAX_VALUE);
-        eliteLaserTurretDamage = BUILDER.comment("Damage of the Elite Laser Turret").defineInRange("eliteLaserTurretDamage", 3F, 0F, Integer.MAX_VALUE);
+        eliteLaserTurretDamage = BUILDER.comment("Damage of the Elite Laser Turret").defineInRange("eliteLaserTurretDamage", 4.0, 0.0, Double.MAX_VALUE);
         eliteLaserTurretEnergyCapacity = BUILDER.comment("Energy Capacity of the Elite Laser Turret").defineInRange("eliteLaserTurretEnergyCapacity", 90000, 0, Integer.MAX_VALUE);
         eliteLaserTurretRange = BUILDER.comment("Range of the Elite Laser Turret").defineInRange("eliteLaserTurretRange", 35D, 0D, 1000);
 
         ultimateLaserTurretCooldown = BUILDER.comment("Cooldown of the Ultimate Laser Turret").defineInRange("ultimateLaserTurretCooldown", 35, 0, Integer.MAX_VALUE);
-        ultimateLaserTurretDamage = BUILDER.comment("Damage of the Ultimate Laser Turret").defineInRange("ultimateLaserTurretDamage", 4F, 0F, Integer.MAX_VALUE);
+        ultimateLaserTurretDamage = BUILDER.comment("Damage of the Ultimate Laser Turret").defineInRange("ultimateLaserTurretDamage", 5.0, 0.0, Double.MAX_VALUE);
         ultimateLaserTurretEnergyCapacity = BUILDER.comment("Energy Capacity of the Ultimate Laser Turret").defineInRange("ultimateLaserTurretEnergyCapacity", 160000, 0, Integer.MAX_VALUE);
         ultimateLaserTurretRange = BUILDER.comment("Range of the Ultimate Laser Turret").defineInRange("ultimateLaserTurretRange", 45D, 0D, 1000);
 
@@ -90,8 +90,8 @@ public class MekanismTurretsConfig {
         flameThrowerTurretFuelPerShot = BUILDER.comment("Fuel consumed per shot (mB)").defineInRange("flameThrowerTurretFuelPerShot", 10, 0, Integer.MAX_VALUE);
 
         // Flame Entity Damage Configuration
-        flameDirectHitDamage = BUILDER.comment("Direct hit damage when flame projectile hits an entity").defineInRange("flameDirectHitDamage", 5.0, 0.0, Double.MAX_VALUE);
-        flameGroundDamagePerTick = BUILDER.comment("Damage per tick from ground fire (reference: Advanced Laser Turret = 2.0)").defineInRange("flameGroundDamagePerTick", 2.0, 0.0, Double.MAX_VALUE);
+        flameDirectHitDamage = BUILDER.comment("Direct hit damage when flame projectile hits an entity").defineInRange("flameDirectHitDamage", 4.0, 0.0, Double.MAX_VALUE);
+        flameGroundDamagePerTick = BUILDER.comment("Damage per tick from ground fire (reference: Advanced Laser Turret = 2.0)").defineInRange("flameGroundDamagePerTick", 1.5, 0.0, Double.MAX_VALUE);
         flameGroundDuration = BUILDER.comment("Duration of ground fire in ticks (100 ticks = 5 seconds)").defineInRange("flameGroundDuration", 100, 0, Integer.MAX_VALUE);
         flameDamageRadius = BUILDER.comment("Radius of ground fire damage area (blocks)").defineInRange("flameDamageRadius", 3.0, 0.0, 100.0);
 

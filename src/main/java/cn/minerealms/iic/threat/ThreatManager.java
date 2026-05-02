@@ -3,6 +3,7 @@ package cn.minerealms.iic.threat;
 import cn.minerealms.iic.ai.CreeperTargetMachineGoal;
 import cn.minerealms.iic.ai.ZombieDestroyMachineGoal;
 import cn.minerealms.iic.industrial.IndustrialLogger;
+import cn.minerealms.iic.industrial.TriAxisConfig;
 import cn.minerealms.iic.integration.gregtech.GTIntegration;
 import net.minecraft.core.BlockPos;
 import net.minecraft.server.level.ServerLevel;
@@ -12,6 +13,8 @@ import net.minecraft.world.entity.monster.Creeper;
 import net.minecraft.world.entity.monster.Zombie;
 import net.minecraft.world.level.ChunkPos;
 import net.minecraft.world.level.levelgen.Heightmap;
+
+import java.util.concurrent.atomic.AtomicInteger;
 
 /**
  * Threat Manager - Triggers different threat mechanisms based on voltage tier and pollution levels.
@@ -33,28 +36,8 @@ import net.minecraft.world.level.levelgen.Heightmap;
  */
 public class ThreatManager {
 
-    // === Configuration Parameters ===
-
-    /** Pollution threshold for MV-tier zombies to attack machines */
-    public static double MV_ZOMBIE_ATTACK_THRESHOLD = 50.0;
-
-    /** Pollution threshold for HV-tier active zombie spawning */
-    public static double HV_ZOMBIE_SPAWN_THRESHOLD = 80.0;
-
-    /** Pollution threshold for HV-tier active creeper spawning */
-    public static double HV_CREEPER_SPAWN_THRESHOLD = 120.0;
-
-    /** Pollution threshold for charged creeper spawning */
-    public static double CHARGED_CREEPER_THRESHOLD = 200.0;
-
-    /** Spawn probability per second for zombies (1%) */
-    public static double ZOMBIE_SPAWN_CHANCE = 0.01;
-
-    /** Spawn probability per second for creepers (0.5%) */
-    public static double CREEPER_SPAWN_CHANCE = 0.005;
-
-    /** Spawn probability per second for charged creepers (0.1%) */
-    public static double CHARGED_CREEPER_CHANCE = 0.001;
+    /** Global threat entity counter (performance limit) */
+    private static final AtomicInteger globalThreatEntityCount = new AtomicInteger(0);
 
     /**
      * Checks and triggers threat mechanisms based on current conditions.
@@ -66,20 +49,100 @@ public class ThreatManager {
      * @param avgVoltageTier Average voltage tier of machines in the chunk
      */
     public static void checkAndTriggerThreats(ServerLevel level, ChunkPos chunkPos, double pollution, double avgVoltageTier) {
+        // Global entity limit check (performance protection, configurable)
+        if (globalThreatEntityCount.get() >= TriAxisConfig.threatMaxGlobalEntities) {
+            if (IndustrialLogger.isDebugEnabled() && level.getGameTime() % TriAxisConfig.debugLogInterval == 0) {
+                IndustrialLogger.debugPollution(String.format(
+                    "[IIC-Threat] Global entity limit reached (%d/%d), skipping spawn",
+                    globalThreatEntityCount.get(), TriAxisConfig.threatMaxGlobalEntities));
+            }
+            return;
+        }
+
         // MV stage: Nearby zombies will attack machines (implemented via AI, no handling needed here)
 
-        // HV stage: Active threat spawning
+        // HV stage: Active threat spawning with dynamic rates
         if (avgVoltageTier >= 3.0) { // HV+
-            // Spawn zombies
-            if (pollution >= HV_ZOMBIE_SPAWN_THRESHOLD && level.random.nextDouble() < ZOMBIE_SPAWN_CHANCE) {
-                spawnHostileZombie(level, chunkPos);
+            // Dynamic spawn rate: increases with pollution (configurable divisor)
+            double baseZombieRate = TriAxisConfig.zombieSpawnChance;
+            double zombieSpawnRate = baseZombieRate * (1.0 + pollution / TriAxisConfig.threatSpawnRatePollutionDivisor);
+
+            // Spawn zombie waves
+            if (pollution >= TriAxisConfig.hvZombieSpawnThreshold && level.random.nextDouble() < zombieSpawnRate) {
+                int waveSize = calculateWaveSize(pollution, avgVoltageTier, false);
+                spawnHostileWave(level, chunkPos, waveSize, false);
             }
 
-            // Spawn creepers
-            if (pollution >= HV_CREEPER_SPAWN_THRESHOLD && level.random.nextDouble() < CREEPER_SPAWN_CHANCE) {
-                boolean charged = pollution >= CHARGED_CREEPER_THRESHOLD && level.random.nextDouble() < CHARGED_CREEPER_CHANCE;
-                spawnHostileCreeper(level, chunkPos, charged);
+            // Dynamic creeper spawn rate (configurable divisor)
+            double baseCreeperRate = TriAxisConfig.creeperSpawnChance;
+            double creeperSpawnRate = baseCreeperRate * (1.0 + pollution / TriAxisConfig.threatSpawnRatePollutionDivisor);
+
+            // Spawn creeper waves
+            if (pollution >= TriAxisConfig.hvCreeperSpawnThreshold && level.random.nextDouble() < creeperSpawnRate) {
+                boolean includeCharged = pollution >= TriAxisConfig.chargedCreeperThreshold;
+                int waveSize = calculateWaveSize(pollution, avgVoltageTier, true);
+                spawnHostileWave(level, chunkPos, waveSize, includeCharged);
             }
+        }
+    }
+
+    /**
+     * Calculate wave size based on pollution and voltage tier.
+     * Formula: base + (pollution / divisor) + (tier / divisor)
+     *
+     * @param pollution Current pollution level
+     * @param avgVoltageTier Average voltage tier
+     * @param isCreeper Whether this is a creeper wave (smaller waves)
+     * @return Wave size (capped at max)
+     */
+    private static int calculateWaveSize(double pollution, double avgVoltageTier, boolean isCreeper) {
+        int base = isCreeper ? TriAxisConfig.waveCreeperBaseSize : TriAxisConfig.waveBaseSize;
+        int pollutionBonus = (int)(pollution / TriAxisConfig.wavePollutionDivisor);
+        int tierBonus = (int)(avgVoltageTier / TriAxisConfig.waveTierDivisor);
+
+        int total = base + pollutionBonus + tierBonus;
+
+        // Cap at max size (performance limit)
+        int maxSize = isCreeper ? TriAxisConfig.waveCreeperMaxSize : TriAxisConfig.waveMaxSize;
+        return Math.min(total, maxSize);
+    }
+
+    /**
+     * Spawn a wave of hostile mobs.
+     * Thread-safe: can be called from async context.
+     *
+     * @param level The server level
+     * @param chunkPos The chunk position
+     * @param count Number of mobs to spawn
+     * @param includeCharged Whether to include charged creepers
+     */
+    private static void spawnHostileWave(ServerLevel level, ChunkPos chunkPos, int count, boolean includeCharged) {
+        int zombies = 0;
+        int creepers = 0;
+        int chargedCreepers = 0;
+
+        for (int i = 0; i < count; i++) {
+            // Mix of zombies and creepers
+            if (includeCharged && level.random.nextDouble() < TriAxisConfig.waveCreeperChance) {
+                // Creeper wave
+                boolean charged = level.random.nextDouble() < TriAxisConfig.chargedCreeperChance;
+                spawnHostileCreeper(level, chunkPos, charged);
+                if (charged) {
+                    chargedCreepers++;
+                } else {
+                    creepers++;
+                }
+            } else {
+                // Zombie wave
+                spawnHostileZombie(level, chunkPos);
+                zombies++;
+            }
+        }
+
+        if (IndustrialLogger.isDebugEnabled()) {
+            IndustrialLogger.debugPollution(String.format(
+                    "Spawned hostile wave at chunk %s: %d zombies, %d creepers, %d charged creepers (total: %d)",
+                    chunkPos, zombies, creepers, chargedCreepers, count));
         }
     }
 
@@ -91,6 +154,11 @@ public class ThreatManager {
      * @param chunkPos The chunk position for spawn location
      */
     private static void spawnHostileZombie(ServerLevel level, ChunkPos chunkPos) {
+        // Check global limit
+        if (globalThreatEntityCount.get() >= TriAxisConfig.threatMaxGlobalEntities) {
+            return;
+        }
+
         BlockPos spawnPos = findSpawnPosition(level, chunkPos);
         if (spawnPos == null) return;
 
@@ -103,11 +171,16 @@ public class ThreatManager {
             // Add machine-attacking AI (high priority)
             zombie.goalSelector.addGoal(1, new ZombieDestroyMachineGoal(zombie));
 
+            // Mark as threat entity
+            zombie.getPersistentData().putBoolean("IIC_ThreatEntity", true);
+
             level.addFreshEntity(zombie);
+            globalThreatEntityCount.incrementAndGet();
 
             if (IndustrialLogger.isDebugEnabled()) {
                 IndustrialLogger.debugPollution(String.format(
-                        "Spawned hostile zombie at %s (chunk %s)", spawnPos, chunkPos));
+                        "Spawned hostile zombie at %s (chunk %s) [Global: %d/%d]",
+                        spawnPos, chunkPos, globalThreatEntityCount.get(), TriAxisConfig.threatMaxGlobalEntities));
             }
         }
     }
@@ -121,6 +194,11 @@ public class ThreatManager {
      * @param charged Whether to spawn as a charged creeper
      */
     private static void spawnHostileCreeper(ServerLevel level, ChunkPos chunkPos, boolean charged) {
+        // Check global limit
+        if (globalThreatEntityCount.get() >= TriAxisConfig.threatMaxGlobalEntities) {
+            return;
+        }
+
         BlockPos spawnPos = findSpawnPosition(level, chunkPos);
         if (spawnPos == null) return;
 
@@ -133,7 +211,11 @@ public class ThreatManager {
             // Add machine-attacking AI (high priority)
             creeper.goalSelector.addGoal(1, new CreeperTargetMachineGoal(creeper));
 
+            // Mark as threat entity
+            creeper.getPersistentData().putBoolean("IIC_ThreatEntity", true);
+
             level.addFreshEntity(creeper);
+            globalThreatEntityCount.incrementAndGet();
 
             // Charged creeper: Summon lightning immediately after spawn
             if (charged) {
@@ -147,8 +229,9 @@ public class ThreatManager {
 
             if (IndustrialLogger.isDebugEnabled()) {
                 IndustrialLogger.debugPollution(String.format(
-                        "Spawned hostile %screeper at %s (chunk %s)",
-                        charged ? "CHARGED " : "", spawnPos, chunkPos));
+                        "Spawned hostile %screeper at %s (chunk %s) [Global: %d/%d]",
+                        charged ? "CHARGED " : "", spawnPos, chunkPos,
+                        globalThreatEntityCount.get(), TriAxisConfig.threatMaxGlobalEntities));
             }
         }
     }
@@ -203,5 +286,37 @@ public class ThreatManager {
         }
 
         return count > 0 ? (double) totalTier / count : 0;
+    }
+
+    /**
+     * Called when a threat entity is removed (death, despawn, etc.)
+     * Decrements the global counter.
+     *
+     * @param entity The entity being removed
+     */
+    public static void onThreatEntityRemoved(net.minecraft.world.entity.Entity entity) {
+        if (entity.getPersistentData().getBoolean("IIC_ThreatEntity")) {
+            int current = globalThreatEntityCount.decrementAndGet();
+            if (current < 0) {
+                globalThreatEntityCount.set(0); // Safety check
+            }
+        }
+    }
+
+    /**
+     * Gets the current global threat entity count.
+     *
+     * @return Current count
+     */
+    public static int getGlobalThreatEntityCount() {
+        return globalThreatEntityCount.get();
+    }
+
+    /**
+     * Resets the global threat entity counter.
+     * Should be called on server restart or world unload.
+     */
+    public static void resetGlobalCounter() {
+        globalThreatEntityCount.set(0);
     }
 }

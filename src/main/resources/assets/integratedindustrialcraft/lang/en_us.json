@@ -88,5 +88,7 @@
   "message.integratedindustrialcraft.turret_wrong_side": "Cannot place turret on the energy input face!",
   "item_group.integratedindustrialcraft": "Mekanism Turrets",
   "death.attack.integratedindustrialcraft.laser": "%1$s was evaporated by a laser turret",
-  "death.attack.integratedindustrialcraft.electric_fence": "%1$s was electrocuted by an electric fence"
+  "death.attack.integratedindustrialcraft.electric_fence": "%1$s was electrocuted by an electric fence",
+  "gui.iic.pollution_overlay_on": "Pollution Overlay: ON",
+  "gui.iic.pollution_overlay_off": "Pollution Overlay: OFF"
 }
