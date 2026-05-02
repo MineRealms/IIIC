@@ -8,17 +8,19 @@ import net.minecraft.core.BlockPos;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.util.Mth;
 import net.minecraft.world.entity.player.Player;
+import net.minecraft.world.level.ChunkPos;
 import java.util.HashMap;
 import java.util.Map;
 
 public class TriAxisDifficultyManager {
 
-    // 缓存上一次的难度，用于平滑过渡和限速 (Chunk/Pos -> Difficulty)
-    private static final Map<BlockPos, Double> difficultyCache = new HashMap<>();
-    private static final Map<BlockPos, Double> pollutionEmaCache = new HashMap<>();
+    // 缓存上一次的难度，用于平滑过渡和限速 (ChunkPos -> Difficulty)
+    // 使用 ChunkPos 而不是 BlockPos，避免玩家移动/怪物位置变化导致缓存失效
+    private static final Map<ChunkPos, Double> difficultyCache = new HashMap<>();
+    private static final Map<ChunkPos, Double> pollutionEmaCache = new HashMap<>();
 
-    // 记录上次更新时间，用于基于真实时间的限速 (Chunk/Pos -> GameTime)
-    private static final Map<BlockPos, Long> lastUpdateTime = new HashMap<>();
+    // 记录上次更新时间，用于基于真实时间的限速 (ChunkPos -> GameTime)
+    private static final Map<ChunkPos, Long> lastUpdateTime = new HashMap<>();
 
     public static class DifficultyState {
         public final double totalDifficulty; // D
@@ -35,6 +37,9 @@ public class TriAxisDifficultyManager {
     }
 
     public static DifficultyState calculateLocalDifficulty(ServerLevel level, BlockPos center) {
+        // 使用 ChunkPos 作为缓存 key，避免玩家移动/怪物位置变化导致缓存失效
+        ChunkPos chunkPos = new ChunkPos(center);
+
         // --- 1. 时间轴 (Time Axis - T) - 基础难度 ---
         long mcDays = level.getDayTime() / 24000L;
 
@@ -61,14 +66,14 @@ public class TriAxisDifficultyManager {
 
         // --- 3. Pollution Axis (P) - 环境压力 ---
         // Always use temporary + permanent pollution, regardless of Spore
-        double localPollution = PollutionManager.getTemporaryPollution(new net.minecraft.world.level.ChunkPos(center));
+        double localPollution = PollutionManager.getTemporaryPollution(chunkPos);
         double globalPollution = PollutionManager.getPermanentPollution();
         double totalPollution = localPollution + globalPollution;
 
         // EMA smoothing
-        double currentEma = pollutionEmaCache.getOrDefault(center, 0.0);
+        double currentEma = pollutionEmaCache.getOrDefault(chunkPos, 0.0);
         double newEma = (TriAxisConfig.emaAlpha * totalPollution) + ((1.0 - TriAxisConfig.emaAlpha) * currentEma);
-        pollutionEmaCache.put(center, newEma);
+        pollutionEmaCache.put(chunkPos, newEma);
 
         // Normalize pollution for sigmoid function
         double P = newEma / TriAxisConfig.pollutionDenominator;
@@ -83,9 +88,9 @@ public class TriAxisDifficultyManager {
         double targetD = Base * Scale * Pressure * TriAxisConfig.globalMultiplier;
 
         // --- 5. 迟滞与限速 (Hysteresis & Rate Limiting) - 基于真实时间 ---
-        double currentD = difficultyCache.getOrDefault(center, 0.0);
+        double currentD = difficultyCache.getOrDefault(chunkPos, 0.0);
         long currentTime = level.getGameTime();
-        long lastTime = lastUpdateTime.getOrDefault(center, currentTime);
+        long lastTime = lastUpdateTime.getOrDefault(chunkPos, currentTime);
 
         // 计算自上次更新以来经过的游戏时间（ticks）
         long ticksElapsed = currentTime - lastTime;
@@ -103,14 +108,14 @@ public class TriAxisDifficultyManager {
             delta = Mth.clamp(delta, -maxChange, maxChange);
             double finalD = currentD + delta;
 
-            difficultyCache.put(center, finalD);
-            lastUpdateTime.put(center, currentTime);
+            difficultyCache.put(chunkPos, finalD);
+            lastUpdateTime.put(chunkPos, currentTime);
 
             // Debug Logging
             if (IndustrialLogger.isDebugEnabled() && level.getGameTime() % 100 == 0) {
                 IndustrialLogger.debugDifficulty(String.format(
                         "TriAxis at %s | T: %.4f (Base: %.2f) | V: %.4f (Scale: %.2f) | P: %.4f (Pressure: %.2f) | D: %.4f | TargetD: %.4f | Delta: %.4f | TicksElapsed: %d | LocalPollution: %.2f | GlobalPollution: %.2f",
-                        center, T, Base, V, Scale, P, Pressure, finalD, targetD, delta, ticksElapsed, localPollution, globalPollution));
+                        chunkPos, T, Base, V, Scale, P, Pressure, finalD, targetD, delta, ticksElapsed, localPollution, globalPollution));
             }
 
             return new DifficultyState(finalD, T, V, P);
