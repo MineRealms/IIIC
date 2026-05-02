@@ -12,18 +12,20 @@ import java.util.HashMap;
 import java.util.Map;
 
 public class TriAxisDifficultyManager {
-    
+
     // 缓存上一次的难度，用于平滑过渡和限速 (Chunk/Pos -> Difficulty)
-    // 实际项目中建议挂载到 Chunk 的 SavedData 或 Capability 中，这里为了模块化先用内存 Map 缓存
     private static final Map<BlockPos, Double> difficultyCache = new HashMap<>();
     private static final Map<BlockPos, Double> pollutionEmaCache = new HashMap<>();
+
+    // 记录上次更新时间，用于基于真实时间的限速 (Chunk/Pos -> GameTime)
+    private static final Map<BlockPos, Long> lastUpdateTime = new HashMap<>();
 
     public static class DifficultyState {
         public final double totalDifficulty; // D
         public final double timeFactor;      // T
         public final double voltageFactor;   // V
         public final double pollutionFactor; // P
-        
+
         public DifficultyState(double d, double t, double v, double p) {
             this.totalDifficulty = d;
             this.timeFactor = t;
@@ -80,29 +82,48 @@ public class TriAxisDifficultyManager {
         // Range: 0.5 ~ 36.0 (much wider than additive model's 0 ~ 4.4)
         double targetD = Base * Scale * Pressure * TriAxisConfig.globalMultiplier;
 
-        // --- 5. 迟滞与限速 (Hysteresis & Rate Limiting) ---
+        // --- 5. 迟滞与限速 (Hysteresis & Rate Limiting) - 基于真实时间 ---
         double currentD = difficultyCache.getOrDefault(center, 0.0);
-        double delta = targetD - currentD;
+        long currentTime = level.getGameTime();
+        long lastTime = lastUpdateTime.getOrDefault(center, currentTime);
 
-        // 限制每次计算的最大变化率
-        delta = Mth.clamp(delta, -TriAxisConfig.maxChangePerSec, TriAxisConfig.maxChangePerSec);
-        double finalD = currentD + delta;
+        // 计算自上次更新以来经过的游戏时间（ticks）
+        long ticksElapsed = currentTime - lastTime;
 
-        difficultyCache.put(center, finalD);
+        // 只有当经过至少1 tick时才更新（避免同一tick内多次调用导致重复增长）
+        if (ticksElapsed > 0) {
+            // 计算允许的最大变化量：maxChangePerSec × (经过的秒数)
+            // 20 ticks = 1 second
+            double secondsElapsed = ticksElapsed / 20.0;
+            double maxChange = TriAxisConfig.maxChangePerSec * secondsElapsed;
 
-        // --- 6. Debug Logging - output every 5 seconds (100 ticks) ---
-        if (IndustrialLogger.isDebugEnabled() && level.getGameTime() % 100 == 0) {
-            IndustrialLogger.debugDifficulty(String.format(
-                    "TriAxis at %s | T: %.4f (Base: %.2f) | V: %.4f (Scale: %.2f) | P: %.4f (Pressure: %.2f) | D: %.4f | LocalPollution: %.2f | GlobalPollution: %.2f | TotalPollution: %.2f",
-                    center, T, Base, V, Scale, P, Pressure, finalD, localPollution, globalPollution, totalPollution));
+            double delta = targetD - currentD;
+
+            // 限制变化率（基于实际经过的时间）
+            delta = Mth.clamp(delta, -maxChange, maxChange);
+            double finalD = currentD + delta;
+
+            difficultyCache.put(center, finalD);
+            lastUpdateTime.put(center, currentTime);
+
+            // Debug Logging
+            if (IndustrialLogger.isDebugEnabled() && level.getGameTime() % 100 == 0) {
+                IndustrialLogger.debugDifficulty(String.format(
+                        "TriAxis at %s | T: %.4f (Base: %.2f) | V: %.4f (Scale: %.2f) | P: %.4f (Pressure: %.2f) | D: %.4f | TargetD: %.4f | Delta: %.4f | TicksElapsed: %d | LocalPollution: %.2f | GlobalPollution: %.2f",
+                        center, T, Base, V, Scale, P, Pressure, finalD, targetD, delta, ticksElapsed, localPollution, globalPollution));
+            }
+
+            return new DifficultyState(finalD, T, V, P);
+        } else {
+            // 同一tick内的重复调用，直接返回缓存值
+            return new DifficultyState(currentD, T, V, P);
         }
-
-        return new DifficultyState(finalD, T, V, P);
     }
-    
+
     // 清理缓存（可在服务器关闭或区块卸载时调用）
     public static void clearCache() {
         difficultyCache.clear();
         pollutionEmaCache.clear();
+        lastUpdateTime.clear();
     }
 }
