@@ -32,8 +32,9 @@ public class EventHandler {
                 DifficultyManager.tick(player);
             });
 
-            // Tick Hordes integration for each level
+            // Tick Pollution system for each level
             event.getServer().getAllLevels().forEach(level -> {
+                cn.minerealms.iic.pollution.PollutionManager.tick(level);
                 HordeIntegrationManager.tick(level);
                 AlexsCavesIntegration.tick(level);
             });

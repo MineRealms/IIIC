@@ -87,11 +87,12 @@ public abstract class GuiMapMixin {
                 )
         );
 
-        // Create button (positioned above zoom buttons at x=width-20, y=height-180)
+        // Create button (positioned on right side, between waypoints and players buttons)
+        // Position: right side (width-20), y=height-60 (between waypoints at -20 and players at -40)
         // Texture coordinates: 245 (on) or 229 (off) for x, 80 for y
         this.iic$pollutionButton = new GuiTexturedButton(
-                self.width - 20,           // x: right side
-                self.height - 180,         // y: above zoom buttons
+                self.width - 20,           // x: right side edge
+                self.height - 60,          // y: between waypoints and players buttons
                 20, 20,                    // width, height
                 iic$showPollution ? 245 : 229,  // textureX (changes based on state)
                 80,                        // textureY
