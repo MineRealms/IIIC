@@ -1,10 +1,14 @@
 package cn.minerealms.iic.mixin.xaeromap;
 
+import cn.minerealms.iic.api.PollutionOverlayAPI;
 import cn.minerealms.iic.client.PollutionOverlayRenderer;
 import cn.minerealms.iic.industrial.TriAxisConfig;
 import net.minecraft.client.gui.GuiGraphics;
 import net.minecraft.client.gui.components.Button;
 import net.minecraft.network.chat.Component;
+import net.minecraft.resources.ResourceKey;
+import net.minecraft.resources.ResourceLocation;
+import net.minecraft.world.level.Level;
 import net.minecraftforge.api.distmarker.Dist;
 import net.minecraftforge.api.distmarker.OnlyIn;
 import org.spongepowered.asm.mixin.Mixin;
@@ -12,7 +16,6 @@ import org.spongepowered.asm.mixin.Unique;
 import org.spongepowered.asm.mixin.injection.At;
 import org.spongepowered.asm.mixin.injection.Inject;
 import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
-import xaero.map.WorldMap;
 import xaero.map.gui.CursorBox;
 import xaero.map.gui.GuiMap;
 import xaero.map.gui.GuiTexturedButton;
@@ -43,6 +46,24 @@ import xaero.map.gui.GuiTexturedButton;
 public abstract class GuiMapMixin {
 
     /**
+     * Custom texture for pollution button (off state).
+     */
+    @Unique
+    private static final ResourceLocation POLLUTION_BUTTON_OFF = new ResourceLocation(
+            "integratedindustrialcraft",
+            "textures/gui/pollution_button_off.png"
+    );
+
+    /**
+     * Custom texture for pollution button (on state).
+     */
+    @Unique
+    private static final ResourceLocation POLLUTION_BUTTON_ON = new ResourceLocation(
+            "integratedindustrialcraft",
+            "textures/gui/pollution_button_on.png"
+    );
+
+    /**
      * Pollution toggle button instance.
      * Instance field, not static - safe for Mixin.
      */
@@ -56,6 +77,13 @@ public abstract class GuiMapMixin {
      */
     @Unique
     private static boolean iic$showPollution = false;
+
+    /**
+     * Last viewed dimension for detecting dimension changes.
+     * Used to clear pollution cache when switching dimensions.
+     */
+    @Unique
+    private ResourceKey<Level> iic$lastDimension = null;
 
     /**
      * Inject into init method to add pollution toggle button.
@@ -87,17 +115,16 @@ public abstract class GuiMapMixin {
                 )
         );
 
-        // Create button (positioned on right side, between waypoints and players buttons)
-        // Position: right side (width-20), y=height-60 (between waypoints at -20 and players at -40)
-        // Texture coordinates: 245 (on) or 229 (off) for x, 80 for y
+        // Create button using custom texture
+        // Position: right side (width-20), y=height-60 (between waypoints and players buttons)
+        // Texture: Full 16x16 texture (0, 0) coordinates
         this.iic$pollutionButton = new GuiTexturedButton(
                 self.width - 20,           // x: right side edge
                 self.height - 60,          // y: between waypoints and players buttons
                 20, 20,                    // width, height
-                iic$showPollution ? 245 : 229,  // textureX (changes based on state)
-                80,                        // textureY
+                0, 0,                      // textureX, textureY (use full texture)
                 16, 16,                    // texWidth, texHeight
-                WorldMap.guiTextures,      // Use XaerosWorldMap's texture atlas
+                iic$showPollution ? POLLUTION_BUTTON_ON : POLLUTION_BUTTON_OFF,  // Custom texture
                 this::iic$onPollutionButton,  // Click handler
                 () -> tooltip              // Tooltip supplier
         );
@@ -108,6 +135,8 @@ public abstract class GuiMapMixin {
 
     /**
      * Button click handler - toggles pollution overlay.
+     * <p>
+     * Optimized to directly update button texture instead of reinitializing the entire GUI.
      *
      * <p><b>Mixin规范：</b>
      * <ul>
@@ -120,9 +149,42 @@ public abstract class GuiMapMixin {
     private void iic$onPollutionButton(Button button) {
         iic$showPollution = !iic$showPollution;
 
-        // Reinitialize GUI to update button texture
+        // Update button texture directly without reinitializing GUI
+        if (button instanceof GuiTexturedButton) {
+            GuiTexturedButtonAccessor accessor = (GuiTexturedButtonAccessor) button;
+            accessor.iic_setTexture(iic$showPollution ? POLLUTION_BUTTON_ON : POLLUTION_BUTTON_OFF);
+        }
+    }
+
+    /**
+     * Inject into render method to draw pollution overlay.
+     * <p>
+     * We inject at HEAD to detect dimension changes and clear cache.
+     * We inject at TAIL to ensure the overlay is drawn on top of the map.
+     *
+     * <p><b>Mixin规范：</b>
+     * <ul>
+     *   <li>方法必须是private</li>
+     *   <li>使用@Inject注入</li>
+     *   <li>@At("HEAD")在方法开头检测维度切换</li>
+     *   <li>remap=false匹配类级别设置</li>
+     * </ul>
+     */
+    @Inject(method = "m_88315_", at = @At("HEAD"), remap = false)
+    private void iic$checkDimensionChange(GuiGraphics guiGraphics, int mouseX, int mouseY, float partialTicks, CallbackInfo ci) {
         GuiMap self = (GuiMap) (Object) this;
-        self.init(self.getMinecraft(), self.width, self.height);
+
+        // Check if dimension changed
+        if (self.getMinecraft().level != null) {
+            ResourceKey<Level> currentDim = self.getMinecraft().level.dimension();
+
+            if (iic$lastDimension != null && !iic$lastDimension.equals(currentDim)) {
+                // Dimension changed - clear pollution cache
+                PollutionOverlayAPI.clearCache();
+            }
+
+            iic$lastDimension = currentDim;
+        }
     }
 
     /**

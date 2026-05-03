@@ -1,6 +1,7 @@
 package cn.minerealms.iic.client;
 
 import cn.minerealms.iic.api.PollutionOverlayAPI;
+import cn.minerealms.iic.industrial.IndustrialLogger;
 import cn.minerealms.iic.industrial.TriAxisConfig;
 import cn.minerealms.iic.mixin.xaeromap.GuiMapAccessor;
 import com.mojang.blaze3d.systems.RenderSystem;
@@ -28,6 +29,9 @@ public class PollutionOverlayRenderer {
      * <p>
      * This method is called from {@link cn.minerealms.iic.mixin.xaeromap.GuiMapMixin}
      * during the map rendering phase.
+     * <p>
+     * Performance optimization: Uses LOD (Level of Detail) system to skip rendering
+     * low-pollution chunks when zoomed out.
      *
      * @param guiGraphics The GUI graphics context
      * @param guiMap The GuiMap instance
@@ -58,10 +62,20 @@ public class PollutionOverlayRenderer {
         bufferBuilder.begin(VertexFormat.Mode.QUADS, DefaultVertexFormat.POSITION_COLOR);
         Matrix4f matrix = poseStack.last().pose();
 
+        int renderedChunks = 0;
+        int culledByLOD = 0;
+        int culledByFrustum = 0;
+
         // Render each polluted chunk
         for (Map.Entry<ChunkPos, Double> entry : pollutedChunks.entrySet()) {
             ChunkPos chunkPos = entry.getKey();
             double pollution = entry.getValue();
+
+            // LOD culling: Skip low-pollution chunks when zoomed out
+            if (!shouldRenderChunk(scale, pollution)) {
+                culledByLOD++;
+                continue;
+            }
 
             // Convert chunk world coordinates to screen coordinates
             // 1 chunk = 16 blocks
@@ -72,9 +86,10 @@ public class PollutionOverlayRenderer {
             double screenZ = (chunkWorldZ - cameraZ) * scale + screenHeight / 2.0;
             double chunkSize = 16 * scale; // Chunk size on screen
 
-            // Cull chunks outside screen bounds
+            // Frustum culling: Skip chunks outside screen bounds
             if (screenX + chunkSize < 0 || screenX > screenWidth ||
                 screenZ + chunkSize < 0 || screenZ > screenHeight) {
+                culledByFrustum++;
                 continue;
             }
 
@@ -94,12 +109,48 @@ public class PollutionOverlayRenderer {
                     .color(r, g, b, a).endVertex();
             bufferBuilder.vertex(matrix, (float)screenX, (float)screenZ, 0)
                     .color(r, g, b, a).endVertex();
+
+            renderedChunks++;
         }
 
         BufferUploader.drawWithShader(bufferBuilder.end());
         RenderSystem.disableBlend();
 
         poseStack.popPose();
+
+        // Debug logging (only if debug enabled and many chunks were culled)
+        if (IndustrialLogger.isDebugEnabled() && (culledByLOD > 100 || culledByFrustum > 100)) {
+            IndustrialLogger.debug(String.format(
+                "[PollutionOverlay] Rendered: %d, LOD culled: %d, Frustum culled: %d, Scale: %.2f",
+                renderedChunks, culledByLOD, culledByFrustum, scale
+            ));
+        }
+    }
+
+    /**
+     * LOD (Level of Detail) system - determines if a chunk should be rendered based on zoom level.
+     * <p>
+     * Performance optimization:
+     * <ul>
+     *   <li>Scale < 0.2 (very zoomed out): Only show pollution >= 100 (high pollution)</li>
+     *   <li>Scale < 0.5 (zoomed out): Only show pollution >= 50 (medium+ pollution)</li>
+     *   <li>Scale >= 0.5 (normal/zoomed in): Show all pollution</li>
+     * </ul>
+     *
+     * @param scale Current map scale/zoom level
+     * @param pollution Pollution value
+     * @return true if chunk should be rendered, false to skip
+     */
+    private static boolean shouldRenderChunk(double scale, double pollution) {
+        if (scale < 0.2) {
+            // Very zoomed out - only show high pollution
+            return pollution >= 100.0;
+        } else if (scale < 0.5) {
+            // Zoomed out - only show medium+ pollution
+            return pollution >= 50.0;
+        }
+        // Normal/zoomed in - show all pollution
+        return true;
     }
 
     /**
