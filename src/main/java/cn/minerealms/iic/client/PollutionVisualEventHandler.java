@@ -1,5 +1,6 @@
 package cn.minerealms.iic.client;
 
+import cn.minerealms.iic.industrial.IndustrialLogger;
 import cn.minerealms.iic.pollution.PollutionManager;
 import cn.minerealms.iic.pollution.visual.PollutionVisualEffects;
 import net.minecraft.client.Minecraft;
@@ -10,8 +11,6 @@ import net.minecraftforge.api.distmarker.OnlyIn;
 import net.minecraftforge.event.TickEvent;
 import net.minecraftforge.eventbus.api.SubscribeEvent;
 import net.minecraftforge.fml.common.Mod;
-import org.apache.logging.log4j.LogManager;
-import org.apache.logging.log4j.Logger;
 
 /**
  * Client-side event handler for pollution visual effects.
@@ -23,7 +22,6 @@ import org.apache.logging.log4j.Logger;
 @Mod.EventBusSubscriber(modid = "integratedindustrialcraft", value = Dist.CLIENT)
 public class PollutionVisualEventHandler {
 
-    private static final Logger LOGGER = LogManager.getLogger("PollutionVisualEvents");
     private static int tickCounter = 0;
 
     /**
@@ -40,8 +38,8 @@ public class PollutionVisualEventHandler {
         tickCounter++;
 
         // Log every 100 ticks to verify event is working
-        if (tickCounter % 100 == 0) {
-            LOGGER.info("[PollutionVisualEvents] Event handler is active! Tick: {}", tickCounter);
+        if (IndustrialLogger.isDebugEnabled() && tickCounter % 100 == 0) {
+            IndustrialLogger.debug("[PollutionVisualEvents] Event handler is active! Tick: " + tickCounter);
         }
 
         // Get the player
@@ -60,7 +58,10 @@ public class PollutionVisualEventHandler {
         try {
             cn.minerealms.iic.pollution.visual.PollutionVisualEffects.checkAndTriggerEffects(player, pollution);
         } catch (Exception e) {
-            LOGGER.error("[PollutionVisualEvents] Error triggering effects", e);
+            IndustrialLogger.error("[PollutionVisualEvents] Error triggering effects: " + e.getMessage());
+            if (IndustrialLogger.isDebugEnabled()) {
+                e.printStackTrace();
+            }
         }
     }
 }

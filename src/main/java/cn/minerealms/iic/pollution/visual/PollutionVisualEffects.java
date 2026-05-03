@@ -1,5 +1,6 @@
 package cn.minerealms.iic.pollution.visual;
 
+import cn.minerealms.iic.industrial.IndustrialLogger;
 import cn.minerealms.iic.integration.enhancedvisuals.EnhancedVisualsHelper;
 import net.minecraft.client.Minecraft;
 import net.minecraft.world.effect.MobEffectInstance;
@@ -7,8 +8,6 @@ import net.minecraft.world.effect.MobEffects;
 import net.minecraft.world.entity.player.Player;
 import net.minecraftforge.api.distmarker.Dist;
 import net.minecraftforge.api.distmarker.OnlyIn;
-import org.apache.logging.log4j.LogManager;
-import org.apache.logging.log4j.Logger;
 
 import java.util.Map;
 import java.util.Random;
@@ -39,7 +38,6 @@ import java.util.concurrent.ConcurrentHashMap;
 @OnlyIn(Dist.CLIENT)
 public class PollutionVisualEffects {
 
-    private static final Logger LOGGER = LogManager.getLogger("PollutionVisuals");
     private static final Random RANDOM = new Random();
 
     // ==================== Configuration ====================
@@ -57,9 +55,6 @@ public class PollutionVisualEffects {
 
     /** Last effect trigger time per player (thread-safe) */
     private static final Map<UUID, Long> lastEffectTick = new ConcurrentHashMap<>();
-
-    /** Debug mode toggle */
-    private static boolean debugEnabled = false;
 
     // ==================== Effect Triggering ====================
 
@@ -104,8 +99,8 @@ public class PollutionVisualEffects {
             ));
 
         } catch (Exception e) {
-            LOGGER.error("[PollutionVisuals] Error triggering effects: " + e.getMessage());
-            if (debugEnabled) {
+            IndustrialLogger.error("[PollutionVisuals] Error triggering effects: " + e.getMessage());
+            if (IndustrialLogger.isDebugEnabled()) {
                 e.printStackTrace();
             }
         }
@@ -117,13 +112,13 @@ public class PollutionVisualEffects {
     private static void triggerLightEffects(Player player, double pollution) {
         try {
             // Delegate to EnhancedVisuals helper
-            LOGGER.info("[PollutionVisualEffects] Calling EnhancedVisualsHelper.triggerLightEffects()");
+            IndustrialLogger.info("[PollutionVisualEffects] Calling EnhancedVisualsHelper.triggerLightEffects()");
             cn.minerealms.iic.integration.enhancedvisuals.EnhancedVisualsHelper.triggerLightEffects();
             debugLog(String.format("Light effects triggered: pollution=%.1f", pollution));
         } catch (NoClassDefFoundError e) {
-            LOGGER.error("[PollutionVisualEffects] EnhancedVisualsHelper class not found - EnhancedVisuals may not be installed", e);
+            IndustrialLogger.error("[PollutionVisualEffects] EnhancedVisualsHelper class not found - EnhancedVisuals may not be installed", e);
         } catch (Exception e) {
-            LOGGER.error("[PollutionVisualEffects] Error triggering light effects", e);
+            IndustrialLogger.error("[PollutionVisualEffects] Error triggering light effects", e);
         }
     }
 
@@ -133,7 +128,7 @@ public class PollutionVisualEffects {
     private static void triggerModerateEffects(Player player, double pollution) {
         try {
             // Delegate to EnhancedVisuals helper
-            LOGGER.info("[PollutionVisualEffects] Calling EnhancedVisualsHelper.triggerModerateEffects()");
+            IndustrialLogger.info("[PollutionVisualEffects] Calling EnhancedVisualsHelper.triggerModerateEffects()");
             cn.minerealms.iic.integration.enhancedvisuals.EnhancedVisualsHelper.triggerModerateEffects();
 
             // Apply Nausea I (10 seconds)
@@ -141,9 +136,9 @@ public class PollutionVisualEffects {
 
             debugLog(String.format("Moderate effects triggered: pollution=%.1f", pollution));
         } catch (NoClassDefFoundError e) {
-            LOGGER.error("[PollutionVisualEffects] EnhancedVisualsHelper class not found", e);
+            IndustrialLogger.error("[PollutionVisualEffects] EnhancedVisualsHelper class not found", e);
         } catch (Exception e) {
-            LOGGER.error("[PollutionVisualEffects] Error triggering moderate effects", e);
+            IndustrialLogger.error("[PollutionVisualEffects] Error triggering moderate effects", e);
         }
     }
 
@@ -153,7 +148,7 @@ public class PollutionVisualEffects {
     private static void triggerHeavyEffects(Player player, double pollution) {
         try {
             // Delegate to EnhancedVisuals helper
-            LOGGER.info("[PollutionVisualEffects] Calling EnhancedVisualsHelper.triggerHeavyEffects()");
+            IndustrialLogger.info("[PollutionVisualEffects] Calling EnhancedVisualsHelper.triggerHeavyEffects()");
             cn.minerealms.iic.integration.enhancedvisuals.EnhancedVisualsHelper.triggerHeavyEffects();
 
             // Apply Nausea II (15 seconds)
@@ -161,9 +156,9 @@ public class PollutionVisualEffects {
 
             debugLog(String.format("Heavy effects triggered: pollution=%.1f", pollution));
         } catch (NoClassDefFoundError e) {
-            LOGGER.error("[PollutionVisualEffects] EnhancedVisualsHelper class not found", e);
+            IndustrialLogger.error("[PollutionVisualEffects] EnhancedVisualsHelper class not found", e);
         } catch (Exception e) {
-            LOGGER.error("[PollutionVisualEffects] Error triggering heavy effects", e);
+            IndustrialLogger.error("[PollutionVisualEffects] Error triggering heavy effects", e);
         }
     }
 
@@ -173,7 +168,7 @@ public class PollutionVisualEffects {
     private static void triggerSevereEffects(Player player, double pollution) {
         try {
             // Delegate to EnhancedVisuals helper
-            LOGGER.info("[PollutionVisualEffects] Calling EnhancedVisualsHelper.triggerSevereEffects()");
+            IndustrialLogger.info("[PollutionVisualEffects] Calling EnhancedVisualsHelper.triggerSevereEffects()");
             cn.minerealms.iic.integration.enhancedvisuals.EnhancedVisualsHelper.triggerSevereEffects();
 
             // Apply Nausea III (20 seconds)
@@ -184,9 +179,9 @@ public class PollutionVisualEffects {
 
             debugLog(String.format("Severe effects triggered: pollution=%.1f", pollution));
         } catch (NoClassDefFoundError e) {
-            LOGGER.error("[PollutionVisualEffects] EnhancedVisualsHelper class not found", e);
+            IndustrialLogger.error("[PollutionVisualEffects] EnhancedVisualsHelper class not found", e);
         } catch (Exception e) {
-            LOGGER.error("[PollutionVisualEffects] Error triggering severe effects", e);
+            IndustrialLogger.error("[PollutionVisualEffects] Error triggering severe effects", e);
         }
     }
 
@@ -214,15 +209,15 @@ public class PollutionVisualEffects {
                     triggerHeavyEffects(player, 175.0);
                     triggerSevereEffects(player, 250.0);
                 }
-                default -> LOGGER.warn("[PollutionVisuals] Unknown effect type: " + effectType);
+                default -> IndustrialLogger.warn("[PollutionVisuals] Unknown effect type: " + effectType);
             }
 
-            LOGGER.info(String.format("[PollutionVisuals] Test effect '%s' triggered for %s",
+            IndustrialLogger.info(String.format("[PollutionVisuals] Test effect '%s' triggered for %s",
                 effectType, player.getName().getString()));
 
         } catch (Exception e) {
-            LOGGER.error("[PollutionVisuals] Error triggering test effect: " + e.getMessage());
-            if (debugEnabled) {
+            IndustrialLogger.error("[PollutionVisuals] Error triggering test effect: " + e.getMessage());
+            if (IndustrialLogger.isDebugEnabled()) {
                 e.printStackTrace();
             }
         }
@@ -232,34 +227,31 @@ public class PollutionVisualEffects {
 
     /**
      * Enable or disable debug logging.
+     * Deprecated: Use IndustrialLogger.setDebugEnabled() instead.
      *
      * @param enabled true to enable debug logging
      */
+    @Deprecated
     public static void setDebugEnabled(boolean enabled) {
-        debugEnabled = enabled;
-        if (enabled) {
-            LOGGER.info("[PollutionVisuals] Debug logging ENABLED");
-        } else {
-            LOGGER.info("[PollutionVisuals] Debug logging DISABLED");
-        }
+        IndustrialLogger.setDebugEnabled(enabled);
     }
 
     /**
      * Check if debug logging is enabled.
+     * Deprecated: Use IndustrialLogger.isDebugEnabled() instead.
      *
      * @return true if debug logging is enabled
      */
+    @Deprecated
     public static boolean isDebugEnabled() {
-        return debugEnabled;
+        return IndustrialLogger.isDebugEnabled();
     }
 
     /**
      * Log debug message (only if debug enabled)
      */
     private static void debugLog(String message) {
-        if (debugEnabled) {
-            LOGGER.info("[DEBUG] " + message);
-        }
+        IndustrialLogger.debug("[PollutionVisuals] " + message);
     }
 
     /**
@@ -271,7 +263,7 @@ public class PollutionVisualEffects {
         StringBuilder sb = new StringBuilder();
         sb.append("=== Pollution Visual Effects Diagnostics ===\n");
         sb.append("EnhancedVisuals Integration: ACTIVE (Mixin-based)\n");
-        sb.append("Debug Enabled: ").append(debugEnabled).append("\n");
+        sb.append("Debug Enabled: ").append(IndustrialLogger.isDebugEnabled()).append("\n");
         sb.append("Active Cooldowns: ").append(lastEffectTick.size()).append("\n");
         sb.append("Thresholds:\n");
         sb.append("  - Light: ").append(LIGHT_POLLUTION_THRESHOLD).append("\n");

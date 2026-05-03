@@ -1,7 +1,6 @@
 package cn.minerealms.iic.integration.enhancedvisuals;
 
-import org.apache.logging.log4j.LogManager;
-import org.apache.logging.log4j.Logger;
+import cn.minerealms.iic.industrial.IndustrialLogger;
 
 import java.lang.reflect.Field;
 import java.lang.reflect.Method;
@@ -16,15 +15,13 @@ import java.lang.reflect.Method;
  */
 public class EnhancedVisualsHelper {
 
-    private static final Logger LOGGER = LogManager.getLogger("EnhancedVisualsHelper");
-
     static {
         System.out.println("========================================");
         System.out.println("EnhancedVisualsHelper CLASS LOADED!");
         System.out.println("========================================");
-        LOGGER.error("========================================");
-        LOGGER.error("EnhancedVisualsHelper CLASS LOADED!");
-        LOGGER.error("========================================");
+        IndustrialLogger.info("========================================");
+        IndustrialLogger.info("EnhancedVisualsHelper CLASS LOADED!");
+        IndustrialLogger.info("========================================");
     }
 
     // Cached reflection objects
@@ -47,7 +44,7 @@ public class EnhancedVisualsHelper {
         }
 
         try {
-            LOGGER.info("[EnhancedVisualsHelper] Initializing reflection...");
+            IndustrialLogger.info("[EnhancedVisualsHelper] Initializing reflection...");
 
             // Load classes
             visualManagerClass = Class.forName("team.creative.enhancedvisuals.client.VisualManager");
@@ -69,11 +66,14 @@ public class EnhancedVisualsHelper {
             );
 
             initialized = true;
-            LOGGER.info("[EnhancedVisualsHelper] Reflection initialized successfully");
+            IndustrialLogger.info("[EnhancedVisualsHelper] Reflection initialized successfully");
 
         } catch (Throwable e) {
             initFailed = true;
-            LOGGER.error("[EnhancedVisualsHelper] Failed to initialize reflection", e);
+            IndustrialLogger.error("[EnhancedVisualsHelper] Failed to initialize reflection: " + e.getMessage());
+            if (IndustrialLogger.isDebugEnabled()) {
+                e.printStackTrace();
+            }
         }
     }
 
@@ -89,7 +89,7 @@ public class EnhancedVisualsHelper {
                 }
             }
         } catch (Throwable e) {
-            LOGGER.error("[EnhancedVisualsHelper] Error getting DamageHandler", e);
+            IndustrialLogger.error("[EnhancedVisualsHelper] Error getting DamageHandler: " + e.getMessage());
         }
         return null;
     }
@@ -98,50 +98,54 @@ public class EnhancedVisualsHelper {
      * Trigger light pollution effects (green particles)
      */
     public static void triggerLightEffects() {
-        System.out.println("=== SYSTEM.OUT: triggerLightEffects() ENTRY ===");
-        System.err.println("=== SYSTEM.ERR: triggerLightEffects() ENTRY ===");
-        LOGGER.error("[EnhancedVisualsHelper] === ERROR LEVEL: triggerLightEffects() ENTRY ===");
-        LOGGER.info("[EnhancedVisualsHelper] === triggerLightEffects() ENTRY ===");
+        if (IndustrialLogger.isDebugEnabled()) {
+            System.out.println("=== SYSTEM.OUT: triggerLightEffects() ENTRY ===");
+            System.err.println("=== SYSTEM.ERR: triggerLightEffects() ENTRY ===");
+        }
+        IndustrialLogger.debug("[EnhancedVisualsHelper] === triggerLightEffects() ENTRY ===");
 
         try {
             init();
             if (initFailed) {
-                LOGGER.error("[EnhancedVisualsHelper] Cannot trigger effects - initialization failed");
+                IndustrialLogger.error("[EnhancedVisualsHelper] Cannot trigger effects - initialization failed");
                 return;
             }
 
-            LOGGER.info("[EnhancedVisualsHelper] Step 1: Getting DamageHandler...");
+            IndustrialLogger.debug("[EnhancedVisualsHelper] Step 1: Getting DamageHandler...");
             Object handler = getDamageHandler();
             if (handler == null) {
-                LOGGER.error("[EnhancedVisualsHelper] DamageHandler not found!");
+                IndustrialLogger.error("[EnhancedVisualsHelper] DamageHandler not found!");
                 return;
             }
-            LOGGER.info("[EnhancedVisualsHelper] Step 2: DamageHandler found");
+            IndustrialLogger.debug("[EnhancedVisualsHelper] Step 2: DamageHandler found");
 
             // Get waterDrown field from DamageHandler
-            LOGGER.info("[EnhancedVisualsHelper] Step 3: Getting waterDrown visual type...");
+            IndustrialLogger.debug("[EnhancedVisualsHelper] Step 3: Getting waterDrown visual type...");
             Field waterDrownField = damageHandlerClass.getField("waterDrown");
             Object visualType = waterDrownField.get(handler);
-            LOGGER.info("[EnhancedVisualsHelper] Step 4: Visual type obtained");
+            IndustrialLogger.debug("[EnhancedVisualsHelper] Step 4: Visual type obtained");
 
             // Create Color (100, 255, 100, 150) - green
-            LOGGER.info("[EnhancedVisualsHelper] Step 5: Creating green color...");
+            IndustrialLogger.debug("[EnhancedVisualsHelper] Step 5: Creating green color...");
             Object greenColor = colorClass.getConstructor(int.class, int.class, int.class, int.class)
                 .newInstance(100, 255, 100, 150);
 
             // Create IntMinMax(200, 400)
-            LOGGER.info("[EnhancedVisualsHelper] Step 6: Creating duration range...");
+            IndustrialLogger.debug("[EnhancedVisualsHelper] Step 6: Creating duration range...");
             Object duration = intMinMaxClass.getConstructor(int.class, int.class)
                 .newInstance(200, 400);
 
             // Call VisualManager.addParticlesFadeOut
-            LOGGER.info("[EnhancedVisualsHelper] Step 7: Calling addParticlesFadeOut...");
+            IndustrialLogger.debug("[EnhancedVisualsHelper] Step 7: Calling addParticlesFadeOut...");
             addParticlesFadeOutMethod.invoke(null, visualType, handler, 15, duration, true, greenColor);
 
-            LOGGER.info("[EnhancedVisualsHelper] Step 8: SUCCESS - Light pollution effects triggered!");
+            IndustrialLogger.info("[EnhancedVisualsHelper] Light pollution effects triggered!");
 
         } catch (Throwable e) {
-            LOGGER.error("[EnhancedVisualsHelper] Error triggering light effects", e);
+            IndustrialLogger.error("[EnhancedVisualsHelper] Error triggering light effects: " + e.getMessage());
+            if (IndustrialLogger.isDebugEnabled()) {
+                e.printStackTrace();
+            }
         }
     }
 
@@ -149,7 +153,7 @@ public class EnhancedVisualsHelper {
      * Trigger moderate pollution effects (yellow particles)
      */
     public static void triggerModerateEffects() {
-        LOGGER.info("[EnhancedVisualsHelper] === triggerModerateEffects() ENTRY ===");
+        IndustrialLogger.debug("[EnhancedVisualsHelper] === triggerModerateEffects() ENTRY ===");
 
         try {
             init();
@@ -170,10 +174,10 @@ public class EnhancedVisualsHelper {
 
             addParticlesFadeOutMethod.invoke(null, visualType, handler, 20, duration, true, yellowColor);
 
-            LOGGER.info("[EnhancedVisualsHelper] Moderate pollution effects triggered (yellow)");
+            IndustrialLogger.info("[EnhancedVisualsHelper] Moderate pollution effects triggered (yellow)");
 
         } catch (Throwable e) {
-            LOGGER.error("[EnhancedVisualsHelper] Error triggering moderate effects", e);
+            IndustrialLogger.error("[EnhancedVisualsHelper] Error triggering moderate effects: " + e.getMessage());
         }
     }
 
@@ -181,7 +185,7 @@ public class EnhancedVisualsHelper {
      * Trigger heavy pollution effects (orange particles)
      */
     public static void triggerHeavyEffects() {
-        LOGGER.info("[EnhancedVisualsHelper] === triggerHeavyEffects() ENTRY ===");
+        IndustrialLogger.debug("[EnhancedVisualsHelper] === triggerHeavyEffects() ENTRY ===");
 
         try {
             init();
@@ -202,10 +206,10 @@ public class EnhancedVisualsHelper {
 
             addParticlesFadeOutMethod.invoke(null, visualType, handler, 25, duration, true, orangeColor);
 
-            LOGGER.info("[EnhancedVisualsHelper] Heavy pollution effects triggered (orange)");
+            IndustrialLogger.info("[EnhancedVisualsHelper] Heavy pollution effects triggered (orange)");
 
         } catch (Throwable e) {
-            LOGGER.error("[EnhancedVisualsHelper] Error triggering heavy effects", e);
+            IndustrialLogger.error("[EnhancedVisualsHelper] Error triggering heavy effects: " + e.getMessage());
         }
     }
 
@@ -213,7 +217,7 @@ public class EnhancedVisualsHelper {
      * Trigger severe pollution effects (red particles)
      */
     public static void triggerSevereEffects() {
-        LOGGER.info("[EnhancedVisualsHelper] === triggerSevereEffects() ENTRY ===");
+        IndustrialLogger.debug("[EnhancedVisualsHelper] === triggerSevereEffects() ENTRY ===");
 
         try {
             init();
@@ -234,10 +238,10 @@ public class EnhancedVisualsHelper {
 
             addParticlesFadeOutMethod.invoke(null, visualType, handler, 35, duration, true, redColor);
 
-            LOGGER.info("[EnhancedVisualsHelper] Severe pollution effects triggered (red)");
+            IndustrialLogger.info("[EnhancedVisualsHelper] Severe pollution effects triggered (red)");
 
         } catch (Throwable e) {
-            LOGGER.error("[EnhancedVisualsHelper] Error triggering severe effects", e);
+            IndustrialLogger.error("[EnhancedVisualsHelper] Error triggering severe effects: " + e.getMessage());
         }
     }
 
