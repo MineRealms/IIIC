@@ -455,8 +455,18 @@ public class GTIntegration {
                             // Check if it's an energy hatch
                             String partClassName = part.getClass().getName();
                             if (partClassName.contains("EnergyHatchPartMachine")) {
-                                // Energy hatch exists means multiblock has energy
-                                return true;
+                                // Found energy hatch, check if it has energy
+                                if (part instanceof BlockEntity partBE) {
+                                    LazyOptional<?> cap = partBE.getCapability(net.minecraftforge.common.capabilities.ForgeCapabilities.ENERGY);
+                                    if (cap.isPresent()) {
+                                        Object energyStorage = cap.orElse(null);
+                                        if (energyStorage instanceof net.minecraftforge.energy.IEnergyStorage storage) {
+                                            if (storage.getEnergyStored() > 0) {
+                                                return true;
+                                            }
+                                        }
+                                    }
+                                }
                             }
                         }
                     }
@@ -518,7 +528,44 @@ public class GTIntegration {
                 IndustrialLogger.debugMachine("Machine is not IWorkable");
             }
 
-            // 2. Check energy storage
+            // 2. Special handling: Check energy hatches for multiblock structures
+            if (machine != null && multiblockControllerClass != null && multiblockControllerClass.isInstance(machine)) {
+                IndustrialLogger.debugMachine("Machine is multiblock controller, checking energy hatches...");
+                try {
+                    // Get parts list
+                    java.lang.reflect.Method getPartsMethod = machine.getClass().getMethod("getParts");
+                    Object parts = getPartsMethod.invoke(machine);
+
+                    if (parts instanceof java.util.List) {
+                        IndustrialLogger.debugMachine("Found " + ((java.util.List<?>) parts).size() + " parts");
+                        for (Object part : (java.util.List<?>) parts) {
+                            // Check if it's an energy hatch
+                            String partClassName = part.getClass().getName();
+                            if (partClassName.contains("EnergyHatchPartMachine")) {
+                                IndustrialLogger.debugMachine("Found energy hatch: " + partClassName);
+                                // Found energy hatch, check if it has energy
+                                if (part instanceof BlockEntity partBE) {
+                                    LazyOptional<?> cap = partBE.getCapability(net.minecraftforge.common.capabilities.ForgeCapabilities.ENERGY);
+                                    if (cap.isPresent()) {
+                                        Object energyStorage = cap.orElse(null);
+                                        if (energyStorage instanceof net.minecraftforge.energy.IEnergyStorage storage) {
+                                            int stored = storage.getEnergyStored();
+                                            IndustrialLogger.debugMachine("Energy hatch has " + stored + " FE");
+                                            if (stored > 0) {
+                                                return true;
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
+                } catch (Exception e) {
+                    IndustrialLogger.debugMachine("Error checking energy hatches: " + e.getMessage());
+                }
+            }
+
+            // 3. Check energy storage (single-block machines or fallback)
             LazyOptional<?> cap = be.getCapability(net.minecraftforge.common.capabilities.ForgeCapabilities.ENERGY);
             IndustrialLogger.debugMachine("Energy capability present: " + cap.isPresent());
 
