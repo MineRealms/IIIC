@@ -44,11 +44,17 @@ public class GTIntegration {
     private static Class<?> metaMachineClass = null;
     private static Class<?> metaMachineBlockEntityClass = null;
     private static Class<?> iWorkableClass = null;
+    private static Class<?> iEnergyContainerClass = null;
     private static Class<?> multiblockControllerClass = null;
+    private static Class<?> gtCapabilityClass = null;
     private static Method getMetaMachineMethod = null;
     private static Method getDefinitionMethod = null;
     private static Method getTierMethod = null;
     private static Method isActiveMethod = null;
+    private static Method getEnergyStoredMethod = null;
+    private static Method getMachineStaticMethod = null;
+    private static Object capabilityEnergyContainer = null;
+    private static Object capabilityWorkable = null;
 
     /**
      * Sample counter for debug logging.
@@ -65,8 +71,8 @@ public class GTIntegration {
      * Checks if GregTech CEu is loaded and initializes integration.
      * <p>
      * This method is called automatically on first use. It attempts to load GT classes
-     * using reflection and caches the results. Supports both MetaMachineBlockEntity
-     * (older versions) and direct MetaMachine (newer versions) modes.
+     * using reflection and caches the results. In GTCEU 1.8.0, all GT machines use
+     * MetaMachineBlockEntity as their BlockEntity type.
      *
      * @return true if GregTech CEu is loaded and integration is successful
      */
@@ -74,45 +80,43 @@ public class GTIntegration {
         if (!checkDone) {
             IndustrialLogger.info("=== Initializing GregTech CEu Integration ===");
 
-            // Attempt mode 1: MetaMachineBlockEntity (older or some GTCEU versions)
             try {
                 metaMachineBlockEntityClass = Class.forName("com.gregtechceu.gtceu.api.blockentity.MetaMachineBlockEntity");
                 metaMachineClass = Class.forName("com.gregtechceu.gtceu.api.machine.MetaMachine");
                 iWorkableClass = Class.forName("com.gregtechceu.gtceu.api.capability.IWorkable");
+                iEnergyContainerClass = Class.forName("com.gregtechceu.gtceu.api.capability.IEnergyContainer");
                 multiblockControllerClass = Class.forName("com.gregtechceu.gtceu.api.machine.multiblock.MultiblockControllerMachine");
+                gtCapabilityClass = Class.forName("com.gregtechceu.gtceu.api.capability.forge.GTCapability");
+                Class<?> machineDefinitionClass = Class.forName("com.gregtechceu.gtceu.api.machine.MachineDefinition");
 
                 // Cache methods
                 getMetaMachineMethod = metaMachineBlockEntityClass.getMethod("getMetaMachine");
                 getDefinitionMethod = metaMachineClass.getMethod("getDefinition");
+                getTierMethod = machineDefinitionClass.getMethod("getTier");
                 isActiveMethod = iWorkableClass.getMethod("isActive");
+                getEnergyStoredMethod = iEnergyContainerClass.getMethod("getEnergyStored");
+
+                // Cache GT capabilities
+                capabilityEnergyContainer = gtCapabilityClass.getField("CAPABILITY_ENERGY_CONTAINER").get(null);
+                capabilityWorkable = gtCapabilityClass.getField("CAPABILITY_WORKABLE").get(null);
+
+                // Also cache the static getMachine method for BlockEntity lookup
+                Class<?> blockEntityClass = Class.forName("net.minecraft.world.level.block.entity.BlockEntity");
+                Class<?> levelArg = Class.forName("net.minecraft.world.level.BlockGetter");
+                Class<?> posArg = Class.forName("net.minecraft.core.BlockPos");
+                getMachineStaticMethod = metaMachineClass.getMethod("getMachine", levelArg, posArg);
 
                 useReflection = true;
                 isGTLoaded = true;
                 IndustrialLogger.info("✓ GregTech CEu detected: Using MetaMachineBlockEntity mode");
                 IndustrialLogger.info("  - MetaMachineBlockEntity: " + metaMachineBlockEntityClass.getName());
                 IndustrialLogger.info("  - MetaMachine: " + metaMachineClass.getName());
-            } catch (ClassNotFoundException | NoSuchMethodException e) {
-                IndustrialLogger.info("✗ MetaMachineBlockEntity not found, trying direct MetaMachine mode...");
-
-                // Attempt mode 2: Direct MetaMachine (newer GTCEU)
-                try {
-                    metaMachineClass = Class.forName("com.gregtechceu.gtceu.api.machine.MetaMachine");
-                    iWorkableClass = Class.forName("com.gregtechceu.gtceu.api.capability.IWorkable");
-                    multiblockControllerClass = Class.forName("com.gregtechceu.gtceu.api.machine.multiblock.MultiblockControllerMachine");
-
-                    getDefinitionMethod = metaMachineClass.getMethod("getDefinition");
-                    isActiveMethod = iWorkableClass.getMethod("isActive");
-
-                    useReflection = true;
-                    isGTLoaded = true;
-                    IndustrialLogger.info("✓ GregTech CEu detected: Using direct MetaMachine mode");
-                    IndustrialLogger.info("  - MetaMachine: " + metaMachineClass.getName());
-                } catch (ClassNotFoundException | NoSuchMethodException e2) {
-                    isGTLoaded = false;
-                    IndustrialLogger.warn("✗ GregTech CEu not found or incompatible version");
-                    IndustrialLogger.warn("  Error 1: " + e.getMessage());
-                    IndustrialLogger.warn("  Error 2: " + e2.getMessage());
-                }
+                IndustrialLogger.info("  - MachineDefinition: " + machineDefinitionClass.getName());
+                IndustrialLogger.info("  - GTCapability: " + gtCapabilityClass.getName());
+            } catch (ClassNotFoundException | NoSuchMethodException | NoSuchFieldException | IllegalAccessException e) {
+                isGTLoaded = false;
+                IndustrialLogger.warn("✗ GregTech CEu not found or incompatible version");
+                IndustrialLogger.warn("  Error: " + e.getMessage());
             }
 
             checkDone = true;
@@ -124,8 +128,8 @@ public class GTIntegration {
     /**
      * Checks if a BlockEntity is a GT machine (silent mode, no logging).
      * <p>
-     * This method is optimized for frequent calls during scanning. It does not
-     * output any debug logs to avoid spam.
+     * In GTCEU 1.8.0, all GT machines use MetaMachineBlockEntity as their BlockEntity type.
+     * This method is optimized for frequent calls during scanning.
      *
      * @param be the BlockEntity to check
      * @return true if the BlockEntity is a GT machine
@@ -134,16 +138,9 @@ public class GTIntegration {
         if (!isGTLoaded() || be == null) return false;
 
         try {
-            // Mode 1: MetaMachineBlockEntity
             if (metaMachineBlockEntityClass != null && metaMachineBlockEntityClass.isInstance(be)) {
                 return true;
             }
-
-            // Mode 2: Direct MetaMachine
-            if (metaMachineClass != null && metaMachineClass.isInstance(be)) {
-                return true;
-            }
-
             return false;
         } catch (Throwable t) {
             // Silent failure, no logging
@@ -164,18 +161,10 @@ public class GTIntegration {
         if (!isGTLoaded() || be == null) return false;
 
         try {
-            // Mode 1: MetaMachineBlockEntity
             if (metaMachineBlockEntityClass != null && metaMachineBlockEntityClass.isInstance(be)) {
                 IndustrialLogger.debugGT("Found MetaMachineBlockEntity at " + be.getBlockPos());
                 return true;
             }
-
-            // Mode 2: Direct MetaMachine
-            if (metaMachineClass != null && metaMachineClass.isInstance(be)) {
-                IndustrialLogger.debugGT("Found MetaMachine at " + be.getBlockPos());
-                return true;
-            }
-
             return false;
         } catch (Throwable t) {
             IndustrialLogger.error("Error checking if BlockEntity is GT machine: " + t.getMessage());
@@ -186,11 +175,9 @@ public class GTIntegration {
     /**
      * Gets the voltage tier of a GT machine.
      * <p>
-     * For multiblock structures, this method attempts to get the tier from energy hatches
-     * first, as they provide the most accurate voltage tier for the multiblock. For single-block
-     * machines, it gets the tier from the machine definition.
-     * <p>
-     * Debug logging is sampled (1 in {@value #SAMPLE_RATE}) to avoid spam.
+     * For machines with active recipes, gets the tier from the recipe's EU/t.
+     * For multiblock structures, attempts to get tier from energy hatches.
+     * Falls back to machine definition tier.
      *
      * @param be the BlockEntity to query
      * @return the voltage tier (0=ULV, 1=LV, 2=MV, etc.), or -1 if not a GT machine or error
@@ -199,53 +186,80 @@ public class GTIntegration {
         if (!isGTLoaded() || be == null || !isGTMachine(be)) return -1;
 
         try {
-            Object machine = null;
-
-            // Mode 1: Via MetaMachineBlockEntity.getMetaMachine()
-            if (metaMachineBlockEntityClass != null && metaMachineBlockEntityClass.isInstance(be)) {
-                machine = getMetaMachineMethod.invoke(be);
-                if (machine == null) {
-                    return -1;
-                }
-            }
-            // Mode 2: BlockEntity itself is MetaMachine
-            else if (metaMachineClass != null && metaMachineClass.isInstance(be)) {
-                machine = be;
+            Object machine = getMetaMachineMethod.invoke(be);
+            if (machine == null) {
+                return -1;
             }
 
-            if (machine != null) {
-                // Special handling: If multiblock controller, try to get voltage tier from energy hatch
-                if (multiblockControllerClass != null && multiblockControllerClass.isInstance(machine)) {
-                    int multiblockTier = getMultiblockVoltageTier(machine);
-                    if (multiblockTier >= 0) {
-                        // Sampled output
-                        if (IndustrialLogger.isDebugEnabled() && sampleCounter.incrementAndGet() % SAMPLE_RATE == 0) {
-                            IndustrialLogger.debugGT(String.format("Sample: Multiblock at %s has tier: %d (from energy hatch)", be.getBlockPos(), multiblockTier));
+            // Priority 1: Get tier from active recipe's EU/t
+            try {
+                // Check if machine has IRecipeLogicMachine interface
+                Class<?> recipeLogicMachineClass = Class.forName("com.gregtechceu.gtceu.api.machine.feature.IRecipeLogicMachine");
+                if (recipeLogicMachineClass.isInstance(machine)) {
+                    // Get RecipeLogic
+                    java.lang.reflect.Method getRecipeLogicMethod = recipeLogicMachineClass.getMethod("getRecipeLogic");
+                    Object recipeLogic = getRecipeLogicMethod.invoke(machine);
+
+                    if (recipeLogic != null) {
+                        // Use getLastRecipe() method instead of accessing field directly
+                        java.lang.reflect.Method getLastRecipeMethod = recipeLogic.getClass().getMethod("getLastRecipe");
+                        Object recipe = getLastRecipeMethod.invoke(recipeLogic);
+
+                        if (recipe != null) {
+                            // Get EU/t from recipe
+                            java.lang.reflect.Method getInputEUtMethod = recipe.getClass().getMethod("getInputEUt");
+                            long eut = (long) getInputEUtMethod.invoke(recipe);
+
+                            // Calculate tier from EU/t
+                            int tier = getVoltageTierFromEUt(eut);
+                            if (tier >= 0) {
+                                IndustrialLogger.info("[GTIntegration] Machine at " + be.getBlockPos() +
+                                    " has active recipe with EU/t=" + eut + ", calculated tier=" + tier);
+                                return tier;
+                            }
                         }
-                        return multiblockTier;
                     }
                 }
+            } catch (Exception e) {
+                // Recipe-based tier detection failed, continue to other methods
+            }
 
-                // Standard method: Get from definition
-                Object definition = getDefinitionMethod.invoke(machine);
-                if (definition != null) {
-                    if (getTierMethod == null) {
-                        getTierMethod = definition.getClass().getMethod("getTier");
-                    }
-                    int tier = (int) getTierMethod.invoke(definition);
-
-                    // Sampled output
-                    if (IndustrialLogger.isDebugEnabled() && sampleCounter.incrementAndGet() % SAMPLE_RATE == 0) {
-                        IndustrialLogger.debugGT(String.format("Sample: Machine at %s has tier: %d", be.getBlockPos(), tier));
-                    }
-
-                    return tier;
+            // Priority 2: For multiblock controller, try to get voltage tier from energy hatch
+            if (multiblockControllerClass != null && multiblockControllerClass.isInstance(machine)) {
+                int multiblockTier = getMultiblockVoltageTier(machine);
+                if (multiblockTier >= 0) {
+                    return multiblockTier;
                 }
+            }
+
+            // Priority 3: Get from definition
+            Object definition = getDefinitionMethod.invoke(machine);
+            if (definition != null) {
+                int tier = (int) getTierMethod.invoke(definition);
+                return tier;
             }
         } catch (Throwable t) {
             // Silent failure
         }
         return -1;
+    }
+
+    /**
+     * Calculates voltage tier from EU/t consumption.
+     * GT voltage tiers: ULV=8, LV=32, MV=128, HV=512, EV=2048, IV=8192, LuV=32768, ZPM=131072, UV=524288
+     */
+    private static int getVoltageTierFromEUt(long eut) {
+        if (eut <= 0) return -1;
+        if (eut <= 8) return 0;      // ULV
+        if (eut <= 32) return 1;     // LV
+        if (eut <= 128) return 2;    // MV
+        if (eut <= 512) return 3;    // HV
+        if (eut <= 2048) return 4;   // EV
+        if (eut <= 8192) return 5;   // IV
+        if (eut <= 32768) return 6;  // LuV
+        if (eut <= 131072) return 7; // ZPM
+        if (eut <= 524288) return 8; // UV
+        return 9; // UHV+
     }
 
     /**
@@ -265,8 +279,9 @@ public class GTIntegration {
             Object parts = getPartsMethod.invoke(multiblockController);
 
             if (parts instanceof java.util.List) {
+                java.util.List<?> partsList = (java.util.List<?>) parts;
                 int maxTier = -1;
-                for (Object part : (java.util.List<?>) parts) {
+                for (Object part : partsList) {
                     // Check if it's an EnergyHatchPartMachine or parent class TieredIOPartMachine
                     String partClassName = part.getClass().getName();
                     if (partClassName.contains("EnergyHatchPartMachine") ||
@@ -277,9 +292,6 @@ public class GTIntegration {
                             int tier = (int) getTierMethod.invoke(part);
                             if (tier > maxTier) {
                                 maxTier = tier;
-                                if (IndustrialLogger.isDebugEnabled()) {
-                                    IndustrialLogger.debugGT(String.format("Found energy hatch with tier: %d in multiblock", tier));
-                                }
                             }
                         } catch (Exception e) {
                             // Single part failure doesn't affect others
@@ -292,9 +304,6 @@ public class GTIntegration {
             }
         } catch (Throwable t) {
             // Silent failure
-            if (IndustrialLogger.isDebugEnabled()) {
-                IndustrialLogger.debugGT("Failed to get multiblock tier from energy hatch: " + t.getMessage());
-            }
         }
         return -1;
     }
@@ -312,33 +321,19 @@ public class GTIntegration {
         if (!isGTLoaded() || be == null || !isGTMachine(be)) return -1;
 
         try {
-            Object machine = null;
-
-            // 方案1：通过 MetaMachineBlockEntity.getMetaMachine()
-            if (metaMachineBlockEntityClass != null && metaMachineBlockEntityClass.isInstance(be)) {
-                machine = getMetaMachineMethod.invoke(be);
-                if (machine == null) {
-                    IndustrialLogger.debugGT("MetaMachine is null at " + be.getBlockPos());
-                    return -1;
-                }
-            }
-            // 方案2：BlockEntity 本身就是 MetaMachine
-            else if (metaMachineClass != null && metaMachineClass.isInstance(be)) {
-                machine = be;
+            Object machine = getMetaMachineMethod.invoke(be);
+            if (machine == null) {
+                IndustrialLogger.debugGT("MetaMachine is null at " + be.getBlockPos());
+                return -1;
             }
 
-            if (machine != null) {
-                Object definition = getDefinitionMethod.invoke(machine);
-                if (definition != null) {
-                    if (getTierMethod == null) {
-                        getTierMethod = definition.getClass().getMethod("getTier");
-                    }
-                    int tier = (int) getTierMethod.invoke(definition);
-                    IndustrialLogger.debugGT(String.format("Machine at %s has tier: %d", be.getBlockPos(), tier));
-                    return tier;
-                } else {
-                    IndustrialLogger.debugGT("Definition is null at " + be.getBlockPos());
-                }
+            Object definition = getDefinitionMethod.invoke(machine);
+            if (definition != null) {
+                int tier = (int) getTierMethod.invoke(definition);
+                IndustrialLogger.debugGT(String.format("Machine at %s has tier: %d", be.getBlockPos(), tier));
+                return tier;
+            } else {
+                IndustrialLogger.debugGT("Definition is null at " + be.getBlockPos());
             }
         } catch (Throwable t) {
             IndustrialLogger.error("Error getting voltage tier at " + be.getBlockPos() + ": " + t.getMessage());
@@ -349,7 +344,7 @@ public class GTIntegration {
     /**
      * Checks if a GT machine is currently active (working).
      * <p>
-     * A machine is considered active if it implements IWorkable and its isActive() method returns true.
+     * A machine is considered active if its IWorkable capability's isActive() method returns true.
      * This method does not output logs to avoid spam during frequent checks.
      *
      * @param be the BlockEntity to check
@@ -359,19 +354,13 @@ public class GTIntegration {
         if (!isGTLoaded() || be == null || !isGTMachine(be)) return false;
 
         try {
-            Object machine = null;
-
-            // Get MetaMachine instance
-            if (metaMachineBlockEntityClass != null && metaMachineBlockEntityClass.isInstance(be)) {
-                machine = getMetaMachineMethod.invoke(be);
-            } else if (metaMachineClass != null && metaMachineClass.isInstance(be)) {
-                machine = be;
-            }
-
-            if (machine != null && iWorkableClass != null && iWorkableClass.isInstance(machine)) {
-                boolean active = (boolean) isActiveMethod.invoke(machine);
-                // No logging to avoid spam
-                return active;
+            LazyOptional<?> workableCap = be.getCapability((net.minecraftforge.common.capabilities.Capability<?>) capabilityWorkable);
+            if (workableCap != null && workableCap.isPresent()) {
+                Object workable = workableCap.orElse(null);
+                if (workable != null) {
+                    boolean active = (boolean) isActiveMethod.invoke(workable);
+                    return active;
+                }
             }
         } catch (Throwable t) {
             // Silent failure
@@ -391,20 +380,41 @@ public class GTIntegration {
         if (!isGTLoaded() || be == null || !isGTMachine(be)) return false;
 
         try {
-            Object machine = null;
-
-            // Get MetaMachine instance
-            if (metaMachineBlockEntityClass != null && metaMachineBlockEntityClass.isInstance(be)) {
-                machine = getMetaMachineMethod.invoke(be);
-            } else if (metaMachineClass != null && metaMachineClass.isInstance(be)) {
-                machine = be;
-            }
-
+            Object machine = getMetaMachineMethod.invoke(be);
             if (machine != null && multiblockControllerClass != null) {
-                boolean isMulti = multiblockControllerClass.isInstance(machine);
-                // No logging to avoid spam
-                return isMulti;
+                return multiblockControllerClass.isInstance(machine);
             }
+        } catch (Throwable t) {
+            // Silent failure
+        }
+        return false;
+    }
+
+    /**
+     * Checks if a GT machine is a multiblock part (not a controller).
+     * <p>
+     * Multiblock parts include energy hatches, input/output buses, etc.
+     * We want to filter these out when scanning to avoid counting the same
+     * multiblock structure multiple times.
+     *
+     * @param be the BlockEntity to check
+     * @return true if the machine is a multiblock part (not a controller)
+     */
+    public static boolean isMultiblockPart(BlockEntity be) {
+        if (!isGTLoaded() || be == null || !isGTMachine(be)) return false;
+
+        try {
+            Object machine = getMetaMachineMethod.invoke(be);
+            if (machine == null) return false;
+
+            // Check if it's a multiblock controller - if yes, it's NOT a part
+            if (multiblockControllerClass != null && multiblockControllerClass.isInstance(machine)) {
+                return false;
+            }
+
+            // Check if the machine class name contains "PartMachine"
+            String className = machine.getClass().getName();
+            return className.contains("PartMachine");
         } catch (Throwable t) {
             // Silent failure
         }
@@ -423,7 +433,9 @@ public class GTIntegration {
      * @return true if the machine has energy or is active
      */
     public static boolean hasEnergyOrActive(BlockEntity be) {
-        if (!isGTLoaded() || be == null || !isGTMachine(be)) return false;
+        if (!isGTLoaded() || be == null || !isGTMachine(be)) {
+            return false;
+        }
 
         try {
             Object machine = null;
@@ -455,18 +467,8 @@ public class GTIntegration {
                             // Check if it's an energy hatch
                             String partClassName = part.getClass().getName();
                             if (partClassName.contains("EnergyHatchPartMachine")) {
-                                // Found energy hatch, check if it has energy
-                                if (part instanceof BlockEntity partBE) {
-                                    LazyOptional<?> cap = partBE.getCapability(net.minecraftforge.common.capabilities.ForgeCapabilities.ENERGY);
-                                    if (cap.isPresent()) {
-                                        Object energyStorage = cap.orElse(null);
-                                        if (energyStorage instanceof net.minecraftforge.energy.IEnergyStorage storage) {
-                                            if (storage.getEnergyStored() > 0) {
-                                                return true;
-                                            }
-                                        }
-                                    }
-                                }
+                                // Energy hatch exists means multiblock has energy
+                                return true;
                             }
                         }
                     }
@@ -476,6 +478,7 @@ public class GTIntegration {
             }
 
             // 3. Check energy storage (single-block machines or energy hatches)
+            // Use Forge standard energy capability instead of GTCEU custom capability
             LazyOptional<?> cap = be.getCapability(net.minecraftforge.common.capabilities.ForgeCapabilities.ENERGY);
             if (cap.isPresent()) {
                 Object energyStorage = cap.orElse(null);
@@ -506,44 +509,37 @@ public class GTIntegration {
         }
 
         try {
-            Object machine = null;
-
-            // Get MetaMachine instance
-            if (metaMachineBlockEntityClass != null && metaMachineBlockEntityClass.isInstance(be)) {
-                machine = getMetaMachineMethod.invoke(be);
-                IndustrialLogger.debugMachine("Got machine from MetaMachineBlockEntity: " + (machine != null));
-            } else if (metaMachineClass != null && metaMachineClass.isInstance(be)) {
-                machine = be;
-                IndustrialLogger.debugMachine("BlockEntity is MetaMachine directly");
-            }
-
-            // 1. Check if currently working
-            if (machine != null && iWorkableClass != null && iWorkableClass.isInstance(machine)) {
-                boolean active = (boolean) isActiveMethod.invoke(machine);
-                IndustrialLogger.debugMachine("Machine active check: " + active);
-                if (active) {
-                    return true;
+            // 1. Check if currently working via CAPABILITY_WORKABLE
+            if (capabilityWorkable != null) {
+                LazyOptional<?> workableCap = be.getCapability((net.minecraftforge.common.capabilities.Capability<?>) capabilityWorkable);
+                if (workableCap != null && workableCap.isPresent()) {
+                    Object workable = workableCap.orElse(null);
+                    if (workable != null) {
+                        boolean active = (boolean) isActiveMethod.invoke(workable);
+                        IndustrialLogger.debugMachine("Machine active check: " + active);
+                        if (active) {
+                            return true;
+                        }
+                    }
+                } else {
+                    IndustrialLogger.debugMachine("Machine is not IWorkable");
                 }
-            } else {
-                IndustrialLogger.debugMachine("Machine is not IWorkable");
             }
 
-            // 2. Special handling: Check energy hatches for multiblock structures
+            // 2. Check for energy hatch in multiblock
+            Object machine = getMetaMachineMethod.invoke(be);
             if (machine != null && multiblockControllerClass != null && multiblockControllerClass.isInstance(machine)) {
                 IndustrialLogger.debugMachine("Machine is multiblock controller, checking energy hatches...");
                 try {
-                    // Get parts list
                     java.lang.reflect.Method getPartsMethod = machine.getClass().getMethod("getParts");
                     Object parts = getPartsMethod.invoke(machine);
 
                     if (parts instanceof java.util.List) {
                         IndustrialLogger.debugMachine("Found " + ((java.util.List<?>) parts).size() + " parts");
                         for (Object part : (java.util.List<?>) parts) {
-                            // Check if it's an energy hatch
                             String partClassName = part.getClass().getName();
                             if (partClassName.contains("EnergyHatchPartMachine")) {
                                 IndustrialLogger.debugMachine("Found energy hatch: " + partClassName);
-                                // Found energy hatch, check if it has energy
                                 if (part instanceof BlockEntity partBE) {
                                     LazyOptional<?> cap = partBE.getCapability(net.minecraftforge.common.capabilities.ForgeCapabilities.ENERGY);
                                     if (cap.isPresent()) {
@@ -565,7 +561,7 @@ public class GTIntegration {
                 }
             }
 
-            // 3. Check energy storage (single-block machines or fallback)
+            // 3. Check energy using ForgeCapabilities.ENERGY
             LazyOptional<?> cap = be.getCapability(net.minecraftforge.common.capabilities.ForgeCapabilities.ENERGY);
             IndustrialLogger.debugMachine("Energy capability present: " + cap.isPresent());
 
@@ -587,6 +583,128 @@ public class GTIntegration {
         }
 
         IndustrialLogger.debugMachine("hasEnergyOrActive: Returning false");
+        return false;
+    }
+
+    /**
+     * Checks if a machine has an active recipe running.
+     * This is more precise than hasEnergyOrActive as it specifically checks for recipe execution.
+     *
+     * @param be The BlockEntity to check
+     * @return true if the machine is actively running a recipe
+     */
+    public static boolean hasActiveRecipe(BlockEntity be) {
+        if (!isGTLoaded() || be == null) {
+            return false;
+        }
+
+        try {
+            if (metaMachineBlockEntityClass.isInstance(be)) {
+                Object metaMachine = getMetaMachineMethod.invoke(be);
+                if (metaMachine != null) {
+                    // Check IWorkable capability
+                    if (capabilityWorkable != null) {
+                        LazyOptional<?> workableCap = (LazyOptional<?>) metaMachine.getClass()
+                                .getMethod("getCapability", net.minecraftforge.common.capabilities.Capability.class)
+                                .invoke(metaMachine, capabilityWorkable);
+
+                        if (workableCap.isPresent()) {
+                            Object workable = workableCap.orElse(null);
+                            if (workable != null && iWorkableClass.isInstance(workable)) {
+                                return (boolean) isActiveMethod.invoke(workable);
+                            }
+                        }
+                    }
+                }
+            }
+        } catch (Exception e) {
+            // Silent fail
+        }
+
+        return false;
+    }
+
+    /**
+     * Gets the EU/t (energy per tick) of the currently running recipe.
+     *
+     * @param be The BlockEntity to check
+     * @return The recipe EU/t, or 0 if no recipe is running
+     */
+    public static long getRecipeEUt(BlockEntity be) {
+        if (!isGTLoaded() || be == null) {
+            return 0;
+        }
+
+        try {
+            if (metaMachineBlockEntityClass.isInstance(be)) {
+                Object metaMachine = getMetaMachineMethod.invoke(be);
+                if (metaMachine != null && iWorkableClass.isInstance(metaMachine)) {
+                    // Try to get recipe logic
+                    Method getRecipeLogicMethod = metaMachine.getClass().getMethod("getRecipeLogic");
+                    Object recipeLogic = getRecipeLogicMethod.invoke(metaMachine);
+
+                    if (recipeLogic != null) {
+                        // Get last recipe
+                        Method getLastRecipeMethod = recipeLogic.getClass().getMethod("getLastRecipe");
+                        Object recipe = getLastRecipeMethod.invoke(recipeLogic);
+
+                        if (recipe != null) {
+                            // Get EU/t from recipe data
+                            Method getDataMethod = recipe.getClass().getMethod("data");
+                            Object recipeData = getDataMethod.invoke(recipe);
+
+                            if (recipeData != null) {
+                                Method getEUtMethod = recipeData.getClass().getMethod("getEUt");
+                                return (long) getEUtMethod.invoke(recipeData);
+                            }
+                        }
+                    }
+                }
+            }
+        } catch (Exception e) {
+            // Silent fail
+        }
+
+        return 0;
+    }
+
+    /**
+     * Checks if a machine has a muffler hatch (for multiblocks).
+     * Machines with muffler hatches produce additional pollution.
+     *
+     * @param be The BlockEntity to check
+     * @return true if the machine has a muffler hatch
+     */
+    public static boolean hasMufflerHatch(BlockEntity be) {
+        if (!isGTLoaded() || be == null) {
+            return false;
+        }
+
+        try {
+            if (metaMachineBlockEntityClass.isInstance(be)) {
+                Object metaMachine = getMetaMachineMethod.invoke(be);
+
+                // Check if it's a multiblock controller
+                if (metaMachine != null && multiblockControllerClass.isInstance(metaMachine)) {
+                    // Get multiblock parts
+                    Method getPartsMethod = multiblockControllerClass.getMethod("getParts");
+                    Object parts = getPartsMethod.invoke(metaMachine);
+
+                    if (parts instanceof java.util.List) {
+                        for (Object part : (java.util.List<?>) parts) {
+                            // Check if part is a muffler hatch
+                            String partClassName = part.getClass().getSimpleName();
+                            if (partClassName.contains("Muffler")) {
+                                return true;
+                            }
+                        }
+                    }
+                }
+            }
+        } catch (Exception e) {
+            // Silent fail
+        }
+
         return false;
     }
 }

@@ -26,8 +26,11 @@ public class MachineScanner {
         for (BlockPos pos : BlockPos.betweenClosed(center.offset(-radius, -radius / 2, -radius),
                                                    center.offset(radius, radius / 2, radius))) {
             BlockEntity be = level.getBlockEntity(pos);
-            // 修改：扫描所有有电的机器，不仅仅是正在工作的
-            if (GTIntegration.isGTMachine(be) && GTIntegration.hasEnergyOrActive(be)) {
+
+            // Filter out multiblock parts (energy hatches, etc.) to avoid double-counting
+            if (GTIntegration.isGTMachine(be) &&
+                !GTIntegration.isMultiblockPart(be) &&
+                GTIntegration.hasEnergyOrActive(be)) {
                 int tier = GTIntegration.getVoltageTier(be);
                 if (tier >= 0) {
                     double distSq = pos.distSqr(center);
@@ -37,7 +40,7 @@ public class MachineScanner {
                     tiers.add(tier);
                     weights.add(distanceWeight * typeWeight);
 
-                    // 调试日志
+                    // Debug logging
                     IndustrialLogger.debugMachine(String.format(
                             "Scanned machine at %s | Tier: %d | Active: %s",
                             pos, tier, GTIntegration.isMachineActive(be)));
@@ -45,7 +48,7 @@ public class MachineScanner {
             }
         }
 
-        // 输出扫描结果
+        // Output scan results
         if (IndustrialLogger.isDebugEnabled() && !tiers.isEmpty()) {
             IndustrialLogger.debugMachine(String.format(
                     "Scan complete: Found %d machines with energy", tiers.size()));
@@ -57,11 +60,14 @@ public class MachineScanner {
     public static double scanNearbyVoltageTier(ServerLevel level, BlockPos center) {
         int maxTier = 0;
         int radius = 8;
-        
-        for (BlockPos pos : BlockPos.betweenClosed(center.offset(-radius, -radius / 2, -radius), 
+
+        for (BlockPos pos : BlockPos.betweenClosed(center.offset(-radius, -radius / 2, -radius),
                                                    center.offset(radius, radius / 2, radius))) {
             BlockEntity be = level.getBlockEntity(pos);
-            if (GTIntegration.isGTMachine(be) && GTIntegration.hasEnergyOrActive(be)) {
+            // Filter out multiblock parts to avoid double-counting
+            if (GTIntegration.isGTMachine(be) &&
+                !GTIntegration.isMultiblockPart(be) &&
+                GTIntegration.hasEnergyOrActive(be)) {
                 int tier = GTIntegration.getVoltageTier(be);
                 if (tier > maxTier) {
                     maxTier = tier;
@@ -74,14 +80,17 @@ public class MachineScanner {
     public static double scanNearbyVoltageTierSafely(ServerLevel level, BlockPos center) {
         int maxTier = 0;
         int radius = 8;
-        
-        for (BlockPos pos : BlockPos.betweenClosed(center.offset(-radius, -radius / 2, -radius), 
+
+        for (BlockPos pos : BlockPos.betweenClosed(center.offset(-radius, -radius / 2, -radius),
                                                    center.offset(radius, radius / 2, radius))) {
             // Check if chunk is loaded before trying to get block entity to avoid triggering chunk loads
             if (level.hasChunkAt(pos)) {
                 try {
                     BlockEntity be = level.getBlockEntity(pos);
-                    if (GTIntegration.isGTMachine(be) && GTIntegration.hasEnergyOrActive(be)) {
+                    // Filter out multiblock parts to avoid double-counting
+                    if (GTIntegration.isGTMachine(be) &&
+                        !GTIntegration.isMultiblockPart(be) &&
+                        GTIntegration.hasEnergyOrActive(be)) {
                         int tier = GTIntegration.getVoltageTier(be);
                         if (tier > maxTier) {
                             maxTier = tier;
@@ -96,29 +105,65 @@ public class MachineScanner {
     }
 
     public static int scanNearbyVoltageTierMedianSafely(ServerLevel level, BlockPos center, int radius) {
-        List<Integer> tiers = new ArrayList<>();
-        
-        for (BlockPos pos : BlockPos.betweenClosed(center.offset(-radius, -radius / 2, -radius), 
-                                                   center.offset(radius, radius / 2, radius))) {
-            if (level.hasChunkAt(pos)) {
-                try {
-                    BlockEntity be = level.getBlockEntity(pos);
-                    if (GTIntegration.isGTMachine(be) && GTIntegration.hasEnergyOrActive(be)) {
-                        int tier = GTIntegration.getVoltageTier(be);
-                        if (tier >= 0) {
-                            tiers.add(tier);
+        try {
+            List<Integer> tiers = new ArrayList<>();
+            int scannedBlocks = 0;
+            int loadedChunks = 0;
+            int gtMachines = 0;
+            int multiblockParts = 0;
+
+            for (BlockPos pos : BlockPos.betweenClosed(center.offset(-radius, -radius / 2, -radius),
+                                                       center.offset(radius, radius / 2, radius))) {
+                scannedBlocks++;
+                if (level.hasChunkAt(pos)) {
+                    loadedChunks++;
+                    try {
+                        BlockEntity be = level.getBlockEntity(pos);
+                        boolean isGT = GTIntegration.isGTMachine(be);
+                        if (isGT) {
+                            gtMachines++;
+
+                            // Filter out multiblock parts (energy hatches, etc.)
+                            boolean isPart = GTIntegration.isMultiblockPart(be);
+                            if (isPart) {
+                                multiblockParts++;
+                                continue; // Skip multiblock parts
+                            }
+
+                            boolean hasEnergy = GTIntegration.hasEnergyOrActive(be);
+                            if (hasEnergy) {
+                                int tier = GTIntegration.getVoltageTier(be);
+                                if (tier >= 0) {
+                                    tiers.add(tier);
+                                }
+                            }
                         }
+                    } catch (Exception e) {
+                        IndustrialLogger.error("[MachineScanner] Error scanning block at " + pos, e);
                     }
-                } catch (Exception e) {
-                    // Ignore exceptions during async access
                 }
             }
+
+            IndustrialLogger.infoMachineScan(String.format(
+                "Scan complete: scannedBlocks=%d, loadedChunks=%d, gtMachines=%d, multiblockParts=%d (filtered), tiersFound=%d",
+                scannedBlocks, loadedChunks, gtMachines, multiblockParts, tiers.size()));
+
+            if (tiers.isEmpty()) {
+                IndustrialLogger.infoMachineScan("No machines with energy found, returning tier 0");
+                return 0;
+            }
+
+            // 取中位数 (Median)
+            tiers.sort(Integer::compareTo);
+            int median = tiers.get(tiers.size() / 2);
+
+            IndustrialLogger.infoMachineScan(String.format(
+                "Median tier: %d (from %d machines)", median, tiers.size()));
+
+            return median;
+        } catch (Exception e) {
+            IndustrialLogger.error("[MachineScanner] Fatal error in scanNearbyVoltageTierMedianSafely", e);
+            return 0;
         }
-        
-        if (tiers.isEmpty()) return 0;
-        
-        // 取中位数 (Median)
-        tiers.sort(Integer::compareTo);
-        return tiers.get(tiers.size() / 2);
     }
 }

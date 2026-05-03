@@ -56,9 +56,10 @@ public class MekanismTurretsConfig {
     static  {
         BUILDER.push("Mekanism Turrets Config");
 
+        // Use ResourceLocation strings directly to avoid EntityType field access issues
         List<String> defaultBlacklistedEntities = List.of(
-                ForgeRegistries.ENTITY_TYPES.getKey(EntityType.ENDER_DRAGON).toString(),
-                ForgeRegistries.ENTITY_TYPES.getKey(EntityType.IRON_GOLEM).toString()
+                "minecraft:ender_dragon",
+                "minecraft:iron_golem"
         );
         blacklistedEntities = BUILDER.comment("Entities which will never be targeted by turrets").defineListAllowEmpty("blacklistedEntities", defaultBlacklistedEntities, MekanismTurretsConfig::isEntityId);
 

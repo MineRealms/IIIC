@@ -318,4 +318,50 @@ public class IndustrialLogger {
     public static boolean isFileAppenderInitialized() {
         return fileAppenderInitialized;
     }
+
+    // === Rate-limited INFO logging for production debugging ===
+
+    private static long lastGTIntegrationLog = 0;
+    private static long lastDifficultyLog = 0;
+    private static long lastPollutionLog = 0;
+    private static long lastMachineScanLog = 0;
+
+    /**
+     * Logs GregTech integration info with rate limiting (once per 5 seconds).
+     */
+    public static void infoGTIntegration(String message) {
+        // Temporarily disable rate limiting for debugging
+        LOGGER.info("[IIC-GTIntegration] " + message);
+    }
+
+    /**
+     * Logs difficulty calculation info with rate limiting (once per 5 seconds).
+     */
+    public static void infoDifficulty(String message) {
+        // Temporarily disable rate limiting for debugging
+        LOGGER.info("[IIC-Difficulty] " + message);
+    }
+
+    /**
+     * Logs pollution system info with rate limiting (once per 5 seconds).
+     */
+    public static void infoPollution(String message) {
+        // Temporarily disable rate limiting for debugging
+        LOGGER.info("[IIC-Pollution] " + message);
+    }
+
+    /**
+     * Logs machine scan info with rate limiting (once per 5 seconds).
+     */
+    public static void infoMachineScan(String message) {
+        // Temporarily disable rate limiting for debugging
+        LOGGER.info("[IIC-MachineScanner] " + message);
+    }
+
+    /**
+     * Logs info without rate limiting (use sparingly).
+     */
+    public static void infoWithPrefix(String prefix, String message) {
+        LOGGER.info("[IIC-" + prefix + "] " + message);
+    }
 }

@@ -17,9 +17,11 @@ import net.minecraft.world.level.block.state.BlockState;
 import net.minecraft.world.level.chunk.LevelChunk;
 import net.minecraft.world.level.chunk.LevelChunkSection;
 
+import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.Iterator;
+import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.CompletableFuture;
@@ -160,6 +162,9 @@ public class PollutionManager {
 
         // Pollution update interval (configurable)
         if (tickCounter % TriAxisConfig.pollutionUpdateInterval == 0) {
+            IndustrialLogger.infoPollution(String.format(
+                "[PollutionManager] Tick %d: Starting pollution update (interval=%d)",
+                tickCounter, TriAxisConfig.pollutionUpdateInterval));
             processPollutionDecayAndScanning(level);
         }
 
@@ -184,75 +189,217 @@ public class PollutionManager {
      */
     private static void processPollutionDecayAndScanning(ServerLevel level) {
         Map<ChunkPos, Double> newPollutionThisSec = new HashMap<>();
-        
+
+        // Debug: 检查 level 和 server
+        IndustrialLogger.infoPollution(String.format(
+            "[PollutionManager] DEBUG: level=%s, server=%s",
+            level != null ? level.dimension().location() : "null",
+            level != null && level.getServer() != null ? "present" : "null"));
+
+        // 获取所有在线玩家，在主线程安全获取
+        List<net.minecraft.server.level.ServerPlayer> players = level.getServer().getPlayerList().getPlayers();
+
+        // Debug: 玩家列表详情
+        IndustrialLogger.infoPollution(String.format(
+            "[PollutionManager] DEBUG: players.size()=%d, players.isEmpty()=%s",
+            players.size(), players.isEmpty()));
+
+        if (!players.isEmpty()) {
+            for (int i = 0; i < Math.min(players.size(), 3); i++) {
+                net.minecraft.server.level.ServerPlayer p = players.get(i);
+                IndustrialLogger.infoPollution(String.format(
+                    "[PollutionManager] DEBUG: player[%d]=%s, pos=%s, chunk=%s",
+                    i, p.getName().getString(), p.blockPosition(), p.chunkPosition()));
+            }
+        }
+
+        // 收集玩家附近的区块（避免扫描整个世界）
+        Set<ChunkPos> chunksToScan = new HashSet<>();
+        int scanRadius = TriAxisConfig.pollutionMachineScanRadius;
+
+        IndustrialLogger.infoPollution(String.format(
+            "[PollutionManager] DEBUG: scanRadius=%d", scanRadius));
+
+        for (net.minecraft.server.level.ServerPlayer player : players) {
+            ChunkPos center = player.chunkPosition();
+            IndustrialLogger.infoPollution(String.format(
+                "[PollutionManager] DEBUG: Collecting chunks around player %s at chunk %s",
+                player.getName().getString(), center));
+
+            int chunksBeforePlayer = chunksToScan.size();
+            for (int x = -scanRadius; x <= scanRadius; x++) {
+                for (int z = -scanRadius; z <= scanRadius; z++) {
+                    chunksToScan.add(new ChunkPos(center.x + x, center.z + z));
+                }
+            }
+            IndustrialLogger.infoPollution(String.format(
+                "[PollutionManager] DEBUG: Added %d chunks for player %s (total now: %d)",
+                chunksToScan.size() - chunksBeforePlayer, player.getName().getString(), chunksToScan.size()));
+        }
+
+        // 如果没有玩家，扫描spawn附近的区块（避免完全不扫描）
+        if (chunksToScan.isEmpty()) {
+            IndustrialLogger.infoPollution("[PollutionManager] DEBUG: No players, using spawn area");
+            net.minecraft.core.BlockPos spawnPos = level.getSharedSpawnPos();
+            ChunkPos spawnChunk = new ChunkPos(spawnPos);
+            IndustrialLogger.infoPollution(String.format(
+                "[PollutionManager] DEBUG: Spawn pos=%s, chunk=%s", spawnPos, spawnChunk));
+
+            for (int x = -scanRadius; x <= scanRadius; x++) {
+                for (int z = -scanRadius; z <= scanRadius; z++) {
+                    chunksToScan.add(new ChunkPos(spawnChunk.x + x, spawnChunk.z + z));
+                }
+            }
+            IndustrialLogger.infoPollution(String.format(
+                "[PollutionManager] DEBUG: Added %d chunks around spawn", chunksToScan.size()));
+        }
+
+        IndustrialLogger.infoPollution(String.format(
+            "[PollutionManager] Main thread: players=%d, chunksToScan=%d",
+            players.size(), chunksToScan.size()));
+
+        // Debug: 显示前几个要扫描的区块
+        int chunkIndex = 0;
+        for (ChunkPos cp : chunksToScan) {
+            if (chunkIndex < 5) {
+                IndustrialLogger.infoPollution(String.format(
+                    "[PollutionManager] DEBUG: chunksToScan[%d]=%s, hasChunk=%s",
+                    chunkIndex, cp, level.hasChunk(cp.x, cp.z)));
+            }
+            chunkIndex++;
+            if (chunkIndex >= 5) break;
+        }
+
         CompletableFuture.runAsync(() -> {
-            int scanRadius = TriAxisConfig.pollutionMachineScanRadius;
-            Set<ChunkPos> scannedChunks = new HashSet<>();
-            
-            for (net.minecraft.server.level.ServerPlayer player : level.players()) {
-                ChunkPos center = player.chunkPosition();
-                for (int x = -scanRadius; x <= scanRadius; x++) {
-                    for (int z = -scanRadius; z <= scanRadius; z++) {
-                        ChunkPos scanPos = new ChunkPos(center.x + x, center.z + z);
-                        if (scannedChunks.add(scanPos) && level.hasChunk(scanPos.x, scanPos.z)) {
-                            net.minecraft.world.level.chunk.LevelChunk chunk = level.getChunk(scanPos.x, scanPos.z);
-                            for (BlockEntity be : chunk.getBlockEntities().values()) {
-                                if (GTIntegration.isGTMachine(be)) {
-                                    if (GTIntegration.hasEnergyOrActive(be)) {
-                                        int tier = GTIntegration.getVoltageTier(be);
-                                        // Exponential pollution generation (Factorio style, configurable)
-                                        // tier 0 (ULV) = 0.01/s, tier 2 (MV) = 0.035/s, tier 4 (EV) = 0.087/s, tier 6 (IV) = 0.21/s
-                                        double pollutionValue = 0.01 * (1 + Math.pow(tier, TriAxisConfig.pollutionTierExponent) * TriAxisConfig.pollutionTierMultiplier);
+            int totalMachinesFound = 0;
+            int activeMachinesFound = 0;
 
-                                        // Multiblock structures produce more pollution (configurable multiplier)
-                                        if (GTIntegration.isMultiblock(be)) {
-                                            pollutionValue *= TriAxisConfig.multiblockPollutionMultiplier;
-                                        }
+            IndustrialLogger.infoPollution(String.format(
+                "[PollutionScanner] Starting scan: chunksToScan=%d",
+                chunksToScan.size()));
 
-                                        ChunkPos cPos = new ChunkPos(be.getBlockPos());
-                                        newPollutionThisSec.merge(cPos, pollutionValue, Double::sum);
+            int scannedCount = 0;
+            for (ChunkPos scanPos : chunksToScan) {
+                scannedCount++;
 
-                                        // Debug logging
-                                        if (IndustrialLogger.isDebugEnabled() && level.getGameTime() % 100 == 0) {
-                                            IndustrialLogger.debugPollution(String.format(
-                                                    "Machine at %s (tier %d, multiblock: %s) produces %.4f temp pollution/sec",
-                                                    be.getBlockPos(), tier, GTIntegration.isMultiblock(be), pollutionValue));
-                                        }
-                                    }
-                                }
+                // Debug: 前5个区块的详细信息
+                if (scannedCount <= 5) {
+                    IndustrialLogger.infoPollution(String.format(
+                        "[PollutionScanner] DEBUG: Checking chunk[%d/%d] %s, hasChunk=%s",
+                        scannedCount, chunksToScan.size(), scanPos, level.hasChunk(scanPos.x, scanPos.z)));
+                }
+
+                if (level.hasChunk(scanPos.x, scanPos.z)) {
+                    net.minecraft.world.level.chunk.LevelChunk chunk = level.getChunk(scanPos.x, scanPos.z);
+                    int chunkMachines = 0;
+                    int chunkActiveMachines = 0;
+
+                    // Debug: 区块实体数量
+                    if (scannedCount <= 5) {
+                        IndustrialLogger.infoPollution(String.format(
+                            "[PollutionScanner] DEBUG: Chunk %s has %d block entities",
+                            scanPos, chunk.getBlockEntities().size()));
+                    }
+
+                    for (BlockEntity be : chunk.getBlockEntities().values()) {
+                        if (GTIntegration.isGTMachine(be)) {
+                            totalMachinesFound++;
+                            chunkMachines++;
+
+                            // Debug: 前3台机器的详细信息
+                            if (totalMachinesFound <= 3) {
+                                IndustrialLogger.infoPollution(String.format(
+                                    "[PollutionScanner] DEBUG: Machine[%d] at %s, type=%s",
+                                    totalMachinesFound, be.getBlockPos(), be.getClass().getSimpleName()));
                             }
 
-                            // GT Pollution Integration - scan GT pollution sources
-                            if (GTIntegration.isGTLoaded()) {
-                                try {
-                                    IndustrialLogger.debug(String.format(
-                                            "[IIC-PollutionSystem] Scanning GT pollution at chunk %s",
-                                            scanPos));
+                            // 检查机器是否有能量或活跃（使用已验证的方法）
+                            boolean hasEnergy = GTIntegration.hasEnergyOrActive(be);
 
-                                    GTPollutionScanner.GTHazardInfo gtHazard = GTPollutionScanner.scanChunkHazards(level, scanPos);
-                                    if (gtHazard != null && gtHazard.sourceCount() > 0) {
-                                        double gtMultiplier = GTPollutionScanner.calculateSourceMultiplier(gtHazard.sourceCount());
-                                        double gtPollutionContribution = gtHazard.strength() * gtMultiplier * TriAxisConfig.gtPollutionWeight;
+                            if (totalMachinesFound <= 3) {
+                                IndustrialLogger.infoPollution(String.format(
+                                    "[PollutionScanner] DEBUG: Machine[%d] hasEnergyOrActive=%s",
+                                    totalMachinesFound, hasEnergy));
+                            }
 
-                                        // Add to temporary pollution for this chunk
-                                        newPollutionThisSec.merge(scanPos, gtPollutionContribution, Double::sum);
+                            if (hasEnergy) {
+                                activeMachinesFound++;
+                                chunkActiveMachines++;
 
-                                        IndustrialLogger.debugPollution(String.format(
-                                                "[IIC-PollutionSystem] GT Pollution added: chunk=%s, strength=%.2f, sources=%d, multiplier=%.2fx, weight=%.2f, contribution=%.4f",
-                                                scanPos, gtHazard.strength(), gtHazard.sourceCount(), gtMultiplier, TriAxisConfig.gtPollutionWeight, gtPollutionContribution));
-                                    } else {
-                                        IndustrialLogger.debug(String.format(
-                                                "[IIC-PollutionSystem] No GT pollution at chunk %s",
-                                                scanPos));
-                                    }
-                                } catch (Exception e) {
-                                    IndustrialLogger.error("[IIC-PollutionSystem] Error scanning GT pollution at chunk " + scanPos + ": " + e.getMessage(), e);
+                                // 获取电压等级作为污染基础
+                                int tier = GTIntegration.getVoltageTier(be);
+
+                                if (totalMachinesFound <= 3) {
+                                    IndustrialLogger.infoPollution(String.format(
+                                        "[PollutionScanner] DEBUG: Machine[%d] tier=%d",
+                                        totalMachinesFound, tier));
                                 }
+
+                                // 污染计算公式：basePollution × (tier+1)^exponent × multiblockBonus
+                                // 设计目标：1台EV多方块24小时 = 240污染
+                                // EV = tier 4: 0.21 × (4+1)^1.3 × 2.0 = 2.77 /秒 × 86400秒 = 240污染
+                                double tierMultiplier = Math.pow(tier + 1, TriAxisConfig.pollutionTierExponent);
+                                double pollutionValue = TriAxisConfig.basePollutionPerSecond * tierMultiplier;
+
+                                // 多方块结构产生更多污染
+                                boolean isMultiblock = GTIntegration.isMultiblock(be);
+                                if (isMultiblock) {
+                                    pollutionValue *= TriAxisConfig.multiblockPollutionMultiplier;
+                                }
+
+                                if (totalMachinesFound <= 3) {
+                                    IndustrialLogger.infoPollution(String.format(
+                                        "[PollutionScanner] DEBUG: Machine[%d] isMultiblock=%s, pollutionValue=%.6f",
+                                        totalMachinesFound, isMultiblock, pollutionValue));
+                                }
+
+                                ChunkPos cPos = new ChunkPos(be.getBlockPos());
+                                newPollutionThisSec.merge(cPos, pollutionValue, Double::sum);
+
+                                IndustrialLogger.infoPollution(String.format(
+                                    "[PollutionScanner] Machine at %s: tier=%d, multiblock=%s, pollution=%.4f/tick",
+                                    be.getBlockPos(), tier, isMultiblock, pollutionValue));
                             }
                         }
                     }
+
+                    if (chunkMachines > 0) {
+                        IndustrialLogger.infoPollution(String.format(
+                            "[PollutionScanner] Chunk %s: machines=%d, active=%d",
+                            scanPos, chunkMachines, chunkActiveMachines));
+                    }
+
+                    // GT Pollution Integration - scan GT pollution sources
+                    if (GTIntegration.isGTLoaded()) {
+                        try {
+                            GTPollutionScanner.GTHazardInfo gtHazard = GTPollutionScanner.scanChunkHazards(level, scanPos);
+                            if (gtHazard != null && gtHazard.sourceCount() > 0) {
+                                double gtMultiplier = GTPollutionScanner.calculateSourceMultiplier(gtHazard.sourceCount());
+                                double gtPollutionContribution = gtHazard.strength() * gtMultiplier * TriAxisConfig.gtPollutionWeight;
+
+                                // Add to temporary pollution for this chunk
+                                newPollutionThisSec.merge(scanPos, gtPollutionContribution, Double::sum);
+
+                                IndustrialLogger.infoPollution(String.format(
+                                        "[PollutionScanner] GT Pollution: chunk=%s, strength=%.2f, sources=%d, contribution=%.4f",
+                                        scanPos, gtHazard.strength(), gtHazard.sourceCount(), gtPollutionContribution));
+                            }
+                        } catch (Exception e) {
+                            IndustrialLogger.error("[PollutionScanner] Error scanning GT pollution at chunk " + scanPos + ": " + e.getMessage(), e);
+                        }
+                    }
+                } else {
+                    // Debug: 区块未加载
+                    if (scannedCount <= 5) {
+                        IndustrialLogger.infoPollution(String.format(
+                            "[PollutionScanner] DEBUG: Chunk %s not loaded, skipping", scanPos));
+                    }
                 }
             }
+
+            IndustrialLogger.infoPollution(String.format(
+                "[PollutionScanner] Scan complete: scannedChunks=%d, totalMachines=%d, activeMachines=%d, pollutionSources=%d",
+                chunksToScan.size(), totalMachinesFound, activeMachinesFound, newPollutionThisSec.size()));
         }).thenAccept(v -> {
             // Process temporary pollution conversion to permanent pollution
             double totalTempPollution = 0;
@@ -279,10 +426,11 @@ public class PollutionManager {
                 double naturalDecay = current * TriAxisConfig.naturalDecayRate;
 
                 // Environmental absorption with absolute cap (configurable)
+                // envScore is already in pollution/sec from calculateChunkReduction()
                 double envScore = getSurroundingEnvironmentalReduction(cPos);
-                // Cap: min(envScore * factor, current * maxPercent)
+                // Cap: min(envScore, current * maxPercent)
                 // This prevents "plant forest = invincible" while still making environment useful
-                double envAbsorb = Math.min(envScore * TriAxisConfig.pollutionEnvAbsorptionFactor, current * TriAxisConfig.pollutionEnvAbsorptionMaxPercent);
+                double envAbsorb = Math.min(envScore, current * TriAxisConfig.pollutionEnvAbsorptionMaxPercent);
 
                 double reduction = naturalDecay + envAbsorb;
                 double added = newPollutionThisSec.getOrDefault(cPos, 0.0);
@@ -408,18 +556,24 @@ public class PollutionManager {
      *
      * <p>Pollution absorption formula (configurable via TriAxisConfig):
      * <ul>
-     *   <li>Each leaf: leafAbsorptionRate (default 0.00005, trees are the main purification source)</li>
-     *   <li>Each water block: waterAbsorptionRate (default 0.00005, water purification)</li>
-     *   <li>Each grass/flower: grassAbsorptionRate (default 0.00002, grass purification)</li>
+     *   <li>Grass block: grassBlockAbsorption (default 0.0015 /sec, typical chunk ~200 blocks = 0.3 /sec)</li>
+     *   <li>Leaves: leavesAbsorption (default 0.0025 /sec, typical chunk ~150 blocks = 0.375 /sec)</li>
+     *   <li>Water: waterAbsorption (default 0.0012 /sec, typical chunk ~50 blocks = 0.06 /sec)</li>
+     *   <li>Grass/flowers: grassAbsorption (default 0.001 /sec)</li>
+     *   <li>Logs: logAbsorption (default 0.001 /sec)</li>
      * </ul>
+     * <p>Design target: Typical natural chunk absorbs ~0.735 pollution/sec
+     * <p>5 HV machines produce 648 pollution in 1 minute, needs ~15 minutes to absorb
      *
      * @param chunk The chunk to scan
-     * @return Total environmental reduction value for the chunk
+     * @return Total environmental reduction value for the chunk (pollution per second)
      */
     private static double calculateChunkReduction(LevelChunk chunk) {
+        int grassBlockCount = 0;
         int leafCount = 0;
         int waterCount = 0;
-        int grassCount = 0;
+        int grassPlantCount = 0;
+        int logCount = 0;
 
         for (LevelChunkSection section : chunk.getSections()) {
             if (section.hasOnlyAir()) continue;
@@ -431,25 +585,31 @@ public class PollutionManager {
                 for (int y = 0; y < 16; y++) {
                     for (int z = 0; z < 16; z++) {
                         BlockState state = section.getBlockState(x, y, z);
-                        if (state.is(Blocks.WATER)) {
-                            waterCount++;
+                        if (state.is(Blocks.GRASS_BLOCK)) {
+                            grassBlockCount++;
                         } else if (state.is(BlockTags.LEAVES)) {
                             leafCount++;
+                        } else if (state.is(Blocks.WATER)) {
+                            waterCount++;
                         } else if (state.is(BlockTags.FLOWERS) ||
                                    state.is(Blocks.GRASS) ||
                                    state.is(Blocks.TALL_GRASS) ||
                                    state.is(Blocks.FERN) ||
                                    state.is(Blocks.LARGE_FERN)) {
-                            grassCount++;
+                            grassPlantCount++;
+                        } else if (state.is(BlockTags.LOGS)) {
+                            logCount++;
                         }
                     }
                 }
             }
         }
 
-        return (leafCount * TriAxisConfig.leafAbsorptionRate) +
-               (waterCount * TriAxisConfig.waterAbsorptionRate) +
-               (grassCount * TriAxisConfig.grassAbsorptionRate);
+        return (grassBlockCount * TriAxisConfig.grassBlockAbsorption) +
+               (leafCount * TriAxisConfig.leavesAbsorption) +
+               (waterCount * TriAxisConfig.waterAbsorption) +
+               (grassPlantCount * TriAxisConfig.grassAbsorption) +
+               (logCount * TriAxisConfig.logAbsorption);
     }
 
     /**

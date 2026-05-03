@@ -292,36 +292,11 @@ public class TriAxisConfig {
     public static double tierGrowthFactor = 0.5;
 
     /**
-     * Pollution multiplier for multiblock structures.
-     * Multiblock machines generate more pollution than single-block machines.
-     * Default: 3.0 (3x pollution)
-     */
-    public static double multiblockPollutionMultiplier = 3.0;
-
-    /**
      * Natural pollution decay rate (proportional, per second).
      * Default: 0.002 (0.2% per second)
      * This is now proportional to current pollution, not a fixed value.
      */
     public static double naturalDecayRate = 0.002;
-
-    /**
-     * Pollution absorption rate per leaf block.
-     * Default: 0.00005 (降低树叶吸收效率)
-     */
-    public static double leafAbsorptionRate = 0.00005;
-
-    /**
-     * Pollution absorption rate per water block.
-     * Default: 0.00005
-     */
-    public static double waterAbsorptionRate = 0.00005;
-
-    /**
-     * Pollution absorption rate per grass block.
-     * Default: 0.00002
-     */
-    public static double grassAbsorptionRate = 0.00002;
 
     /**
      * Threshold for converting temporary pollution to permanent pollution.
@@ -915,29 +890,77 @@ public class TriAxisConfig {
      */
     public static int pollutionMachineScanRadius = 4;
 
+    // ========== Recipe-Based Pollution Configuration ==========
+
+    /**
+     * Base pollution per second for machines running recipes.
+     * Design target: 1 EV multiblock running 24h = 240 pollution
+     * Formula: basePollution × (tier+1)^exponent × multiblockBonus
+     * EV (tier 4): 0.21 × (5)^1.3 × 2.0 = 2.77 /sec × 86400 sec = 240 pollution
+     * Default: 0.21 (pollution per second)
+     */
+    public static double basePollutionPerSecond = 0.21;
+
     /**
      * Tier exponent for pollution calculation.
-     * Used in formula: pollution = 0.01 * (1 + tier^exponent * multiplier)
-     * Default: 1.3
+     * Controls how steeply pollution increases with voltage tier.
+     * Higher values = more pollution from high-tier machines.
+     * Default: 1.3 (moderate exponential growth)
      */
     public static double pollutionTierExponent = 1.3;
 
     /**
-     * Tier multiplier for pollution calculation.
-     * Default: 0.25
+     * Pollution multiplier for multiblock structures.
+     * Multiblock machines produce more pollution than single-block machines.
+     * Default: 2.0 (2x more pollution)
      */
-    public static double pollutionTierMultiplier = 0.25;
+    public static double multiblockPollutionMultiplier = 2.0;
+
+    // ========== Environment Absorption Configuration ==========
 
     /**
-     * Environment absorption factor.
-     * How much pollution each environment score point can absorb.
-     * Default: 0.002
+     * Grass block absorption rate (pollution per second per block).
+     * Typical chunk (16×16) has ~200 grass blocks → 0.3 pollution/sec
+     * Default: 0.0015
      */
-    public static double pollutionEnvAbsorptionFactor = 0.002;
+    public static double grassBlockAbsorption = 0.0015;
+
+    /**
+     * Leaves absorption rate (pollution per second per block).
+     * Typical chunk has ~150 leaves → 0.375 pollution/sec
+     * Default: 0.0025
+     */
+    public static double leavesAbsorption = 0.0025;
+
+    /**
+     * Water absorption rate (pollution per second per block).
+     * Typical chunk has ~50 water blocks → 0.06 pollution/sec
+     * Default: 0.0012
+     */
+    public static double waterAbsorption = 0.0012;
+
+    /**
+     * Grass (plant) absorption rate (pollution per second per block).
+     * Default: 0.001
+     */
+    public static double grassAbsorption = 0.001;
+
+    /**
+     * Log absorption rate (pollution per second per block).
+     * Default: 0.001
+     */
+    public static double logAbsorption = 0.001;
+
+    /**
+     * Flower absorption rate (pollution per second per block).
+     * Default: 0.0012
+     */
+    public static double flowerAbsorption = 0.0012;
 
     /**
      * Maximum environment absorption percentage.
-     * Cap on how much pollution can be absorbed per tick (as % of current).
+     * Cap on how much pollution can be absorbed per second (as % of current).
+     * This prevents "plant forest = invincible" while still making environment useful.
      * Default: 0.15 (15%)
      */
     public static double pollutionEnvAbsorptionMaxPercent = 0.15;
@@ -1093,7 +1116,6 @@ public class TriAxisConfig {
                 sigmoidShift = 2.0;
                 // 污染系统调整
                 naturalDecayRate = 0.002;  // 比例衰减 0.2%/秒
-                leafAbsorptionRate = 0.00005;  // 降低自 0.0001
                 tempToPermanentRate = 0.005;  // 提高自 0.001
                 tempToPermanentThreshold = 200.0;  // 阈值
                 // 威胁系统调整
@@ -1123,7 +1145,6 @@ public class TriAxisConfig {
                 pressureMax = 4.5;
                 sigmoidShift = 1.8;
                 naturalDecayRate = 0.0018;  // 比例衰减，略快
-                leafAbsorptionRate = 0.00004;
                 tempToPermanentRate = 0.006;  // 更快转化
                 tempToPermanentThreshold = 180.0;  // 更低阈值
                 hvZombieSpawnThreshold = 65.0;
@@ -1152,7 +1173,6 @@ public class TriAxisConfig {
                 pressureMax = 5.0;
                 sigmoidShift = 1.5;
                 naturalDecayRate = 0.0015;  // 比例衰减，更慢
-                leafAbsorptionRate = 0.00003;
                 tempToPermanentRate = 0.007;  // 更快转化
                 tempToPermanentThreshold = 150.0;  // 更低阈值
                 hvZombieSpawnThreshold = 60.0;
@@ -1181,7 +1201,6 @@ public class TriAxisConfig {
                 pressureMax = 6.0;
                 sigmoidShift = 1.2;
                 naturalDecayRate = 0.001;  // 比例衰减，极慢
-                leafAbsorptionRate = 0.00002;
                 tempToPermanentRate = 0.010;  // 极快转化
                 tempToPermanentThreshold = 100.0;  // 极低阈值
                 hvZombieSpawnThreshold = 50.0;
@@ -1313,9 +1332,6 @@ public class TriAxisConfig {
 
                 // 污染衰减和吸收
                 naturalDecayRate = Double.parseDouble(props.getProperty("naturalDecayRate", String.valueOf(naturalDecayRate)));
-                leafAbsorptionRate = Double.parseDouble(props.getProperty("leafAbsorptionRate", String.valueOf(leafAbsorptionRate)));
-                waterAbsorptionRate = Double.parseDouble(props.getProperty("waterAbsorptionRate", String.valueOf(waterAbsorptionRate)));
-                grassAbsorptionRate = Double.parseDouble(props.getProperty("grassAbsorptionRate", String.valueOf(grassAbsorptionRate)));
 
                 // 污染转化
                 tempToPermanentThreshold = Double.parseDouble(props.getProperty("tempToPermanentThreshold", String.valueOf(tempToPermanentThreshold)));
@@ -1418,9 +1434,17 @@ public class TriAxisConfig {
                 pollutionUpdateInterval = Integer.parseInt(props.getProperty("pollutionUpdateInterval", String.valueOf(pollutionUpdateInterval)));
                 pollutionEnvironmentScanInterval = Integer.parseInt(props.getProperty("pollutionEnvironmentScanInterval", String.valueOf(pollutionEnvironmentScanInterval)));
                 pollutionMachineScanRadius = Integer.parseInt(props.getProperty("pollutionMachineScanRadius", String.valueOf(pollutionMachineScanRadius)));
+                basePollutionPerSecond = Double.parseDouble(props.getProperty("basePollutionPerSecond", String.valueOf(basePollutionPerSecond)));
                 pollutionTierExponent = Double.parseDouble(props.getProperty("pollutionTierExponent", String.valueOf(pollutionTierExponent)));
-                pollutionTierMultiplier = Double.parseDouble(props.getProperty("pollutionTierMultiplier", String.valueOf(pollutionTierMultiplier)));
-                pollutionEnvAbsorptionFactor = Double.parseDouble(props.getProperty("pollutionEnvAbsorptionFactor", String.valueOf(pollutionEnvAbsorptionFactor)));
+                multiblockPollutionMultiplier = Double.parseDouble(props.getProperty("multiblockPollutionMultiplier", String.valueOf(multiblockPollutionMultiplier)));
+
+                // Environment absorption
+                grassBlockAbsorption = Double.parseDouble(props.getProperty("grassBlockAbsorption", String.valueOf(grassBlockAbsorption)));
+                leavesAbsorption = Double.parseDouble(props.getProperty("leavesAbsorption", String.valueOf(leavesAbsorption)));
+                waterAbsorption = Double.parseDouble(props.getProperty("waterAbsorption", String.valueOf(waterAbsorption)));
+                grassAbsorption = Double.parseDouble(props.getProperty("grassAbsorption", String.valueOf(grassAbsorption)));
+                logAbsorption = Double.parseDouble(props.getProperty("logAbsorption", String.valueOf(logAbsorption)));
+                flowerAbsorption = Double.parseDouble(props.getProperty("flowerAbsorption", String.valueOf(flowerAbsorption)));
                 pollutionEnvAbsorptionMaxPercent = Double.parseDouble(props.getProperty("pollutionEnvAbsorptionMaxPercent", String.valueOf(pollutionEnvAbsorptionMaxPercent)));
                 pollutionDiffusionRate = Double.parseDouble(props.getProperty("pollutionDiffusionRate", String.valueOf(pollutionDiffusionRate)));
                 pollutionRemovalThreshold = Double.parseDouble(props.getProperty("pollutionRemovalThreshold", String.valueOf(pollutionRemovalThreshold)));
@@ -1530,9 +1554,6 @@ public class TriAxisConfig {
 
         // 污染衰减和吸收
         props.setProperty("naturalDecayRate", String.valueOf(naturalDecayRate));
-        props.setProperty("leafAbsorptionRate", String.valueOf(leafAbsorptionRate));
-        props.setProperty("waterAbsorptionRate", String.valueOf(waterAbsorptionRate));
-        props.setProperty("grassAbsorptionRate", String.valueOf(grassAbsorptionRate));
 
         // 污染转化
         props.setProperty("tempToPermanentThreshold", String.valueOf(tempToPermanentThreshold));
@@ -1634,9 +1655,17 @@ public class TriAxisConfig {
         props.setProperty("pollutionUpdateInterval", String.valueOf(pollutionUpdateInterval));
         props.setProperty("pollutionEnvironmentScanInterval", String.valueOf(pollutionEnvironmentScanInterval));
         props.setProperty("pollutionMachineScanRadius", String.valueOf(pollutionMachineScanRadius));
+        props.setProperty("basePollutionPerSecond", String.valueOf(basePollutionPerSecond));
         props.setProperty("pollutionTierExponent", String.valueOf(pollutionTierExponent));
-        props.setProperty("pollutionTierMultiplier", String.valueOf(pollutionTierMultiplier));
-        props.setProperty("pollutionEnvAbsorptionFactor", String.valueOf(pollutionEnvAbsorptionFactor));
+        props.setProperty("multiblockPollutionMultiplier", String.valueOf(multiblockPollutionMultiplier));
+
+        // Environment absorption
+        props.setProperty("grassBlockAbsorption", String.valueOf(grassBlockAbsorption));
+        props.setProperty("leavesAbsorption", String.valueOf(leavesAbsorption));
+        props.setProperty("waterAbsorption", String.valueOf(waterAbsorption));
+        props.setProperty("grassAbsorption", String.valueOf(grassAbsorption));
+        props.setProperty("logAbsorption", String.valueOf(logAbsorption));
+        props.setProperty("flowerAbsorption", String.valueOf(flowerAbsorption));
         props.setProperty("pollutionEnvAbsorptionMaxPercent", String.valueOf(pollutionEnvAbsorptionMaxPercent));
         props.setProperty("pollutionDiffusionRate", String.valueOf(pollutionDiffusionRate));
         props.setProperty("pollutionRemovalThreshold", String.valueOf(pollutionRemovalThreshold));
@@ -1789,14 +1818,18 @@ public class TriAxisConfig {
                         [污染衰减和吸收 Pollution Decay & Absorption]
                         naturalDecayRate: 自然衰减速率 (/秒/区块) (0.01-0.1)
                           - 默认0.03 (降低自0.05，让污染更容易积累)
-                        leafAbsorptionRate: 树叶吸收速率 (/叶/秒) (0.00001-0.0002)
-                          - 默认0.00005 (降低自0.0001)
-                          - 5000叶 = 0.25/秒吸收
-                        waterAbsorptionRate: 水方块吸收速率 (/水/秒) (0.00001-0.0002)
-                          - 默认0.00005
-                          - 1000水 = 0.05/秒吸收
-                        grassAbsorptionRate: 草方块吸收速率 (/草/秒) (0.00001-0.0001)
-                          - 默认0.00002
+                        grassBlockAbsorption: 草方块吸收速率 (/方块/秒) (0.0005-0.005)
+                          - 默认0.0015，典型区块~200块 = 0.3/秒
+                        leavesAbsorption: 树叶吸收速率 (/方块/秒) (0.001-0.01)
+                          - 默认0.0025，典型区块~150块 = 0.375/秒
+                        waterAbsorption: 水方块吸收速率 (/方块/秒) (0.0005-0.005)
+                          - 默认0.0012，典型区块~50块 = 0.06/秒
+                        grassAbsorption: 草/花吸收速率 (/方块/秒) (0.0005-0.005)
+                          - 默认0.001
+                        logAbsorption: 原木吸收速率 (/方块/秒) (0.0005-0.005)
+                          - 默认0.001
+                        flowerAbsorption: 花吸收速率 (/方块/秒) (0.0005-0.005)
+                          - 默认0.0012
 
                         [污染转化 Pollution Conversion]
                         tempToPermanentThreshold: 临时转永久阈值 (100-300)
@@ -1876,8 +1909,10 @@ public class TriAxisConfig {
     public static boolean hasGTCEu() {
         try {
             Class.forName("com.gregtechceu.gtceu.GTCEu");
+            IndustrialLogger.info("[TriAxisConfig] hasGTCEu() -> TRUE");
             return true;
         } catch (ClassNotFoundException e) {
+            IndustrialLogger.warn("[TriAxisConfig] hasGTCEu() -> FALSE: " + e.getMessage());
             return false;
         }
     }

@@ -9,8 +9,9 @@ import net.minecraftforge.event.TickEvent;
 import net.minecraftforge.event.server.ServerStartingEvent;
 import net.minecraftforge.eventbus.api.SubscribeEvent;
 import net.minecraftforge.fml.common.Mod;
+import cn.minerealms.iic.IntegratedIndustrialCraft;
 
-@Mod.EventBusSubscriber
+@Mod.EventBusSubscriber(modid = IntegratedIndustrialCraft.MODID)
 public class EventHandler {
 
     @SubscribeEvent
@@ -32,9 +33,14 @@ public class EventHandler {
                 DifficultyManager.tick(player);
             });
 
-            // Tick Pollution system for each level
+            // Tick Pollution system only for dimensions with players
+            // Avoid scanning empty dimensions (performance optimization)
             event.getServer().getAllLevels().forEach(level -> {
-                cn.minerealms.iic.pollution.PollutionManager.tick(level);
+                // Only tick pollution for dimensions that have players
+                boolean hasPlayers = !level.players().isEmpty();
+                if (hasPlayers) {
+                    cn.minerealms.iic.pollution.PollutionManager.tick(level);
+                }
                 HordeIntegrationManager.tick(level);
                 AlexsCavesIntegration.tick(level);
             });

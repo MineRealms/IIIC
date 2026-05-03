@@ -173,7 +173,7 @@ task copyToGameMods(type: Copy) {
     from(jar.archiveFile) {
         // 只复制主 JAR 文件
     }
-    into 'G:\\MinecraftGames\\CTNH-BaopuEdition\\.minecraft\\versions\\Create New Horizon\\mods'
+    into 'G:\\MinecraftGames\\CTNH-BaopuEdition\\.minecraft\\versions\\GregTech Odyssey\\mods'
 
     // 确保在 reobfJar 完成后执行（使用字符串引用）
     mustRunAfter 'reobfJar'
@@ -191,7 +191,7 @@ task launchTestGame(type: Exec) {
     group = 'deployment'
 
     // Windows PowerShell 执行
-    commandLine 'powershell.exe', '-ExecutionPolicy', 'Bypass', '-File', "${projectDir}\\testgame.ps1"
+    commandLine 'powershell.exe', '-ExecutionPolicy', 'Bypass', '-File', "${projectDir}\\STARTGAME.ps1"
 
     // 设置工作目录为项目根目录
     workingDir projectDir
@@ -230,4 +230,4 @@ task buildAndDeploy {
 // 让 build 任务完成后自动执行部署
 build.finalizedBy('copyToGameMods')
 // 如果需要 build 后自动启动游戏，取消下面这行的注释
-// copyToGameMods.finalizedBy('launchTestGame')
+copyToGameMods.finalizedBy('launchTestGame')

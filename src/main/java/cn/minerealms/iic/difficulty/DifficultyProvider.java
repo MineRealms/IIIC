@@ -49,22 +49,36 @@ public class DifficultyProvider implements DifficultyGetter {
 
     @Override
     public float getDifficulty(ServerLevel level, Vec3 pos) {
-        // Use Tri-Axis Difficulty Model
-        BlockPos blockPos = new BlockPos((int) pos.x, (int) pos.y, (int) pos.z);
-        TriAxisDifficultyManager.DifficultyState state =
-            TriAxisDifficultyManager.calculateLocalDifficulty(level, blockPos);
+        try {
+            // Use Tri-Axis Difficulty Model
+            BlockPos blockPos = new BlockPos((int) pos.x, (int) pos.y, (int) pos.z);
 
-        // Return the total difficulty from tri-axis calculation
-        float difficulty = (float) state.totalDifficulty;
+            IndustrialLogger.infoDifficulty(String.format(
+                "getDifficulty() called at pos=%s", blockPos));
 
-        // Debug logging
-        if (IndustrialLogger.isDebugEnabled() && level.getGameTime() % 100 == 0) {
-            IndustrialLogger.debugDifficulty(String.format(
-                "[DifficultyProvider] Pos: %s | Difficulty: %.4f | T: %.4f | V: %.4f | P: %.4f",
-                blockPos, difficulty, state.timeFactor, state.voltageFactor, state.pollutionFactor));
+            TriAxisDifficultyManager.DifficultyState state =
+                TriAxisDifficultyManager.calculateLocalDifficulty(level, blockPos);
+
+            // Return the total difficulty from tri-axis calculation
+            float difficulty = (float) state.totalDifficulty;
+
+            // Rate-limited INFO logging
+            IndustrialLogger.infoDifficulty(String.format(
+                "Result: Difficulty=%.4f | Time=%.4f | Voltage=%.4f | Pollution=%.4f",
+                difficulty, state.timeFactor, state.voltageFactor, state.pollutionFactor));
+
+            // Debug logging
+            if (IndustrialLogger.isDebugEnabled() && level.getGameTime() % 100 == 0) {
+                IndustrialLogger.debugDifficulty(String.format(
+                    "[DifficultyProvider] Pos: %s | Difficulty: %.4f | T: %.4f | V: %.4f | P: %.4f",
+                    blockPos, difficulty, state.timeFactor, state.voltageFactor, state.pollutionFactor));
+            }
+
+            return difficulty;
+        } catch (Exception e) {
+            IndustrialLogger.error("[DifficultyProvider] Error calculating difficulty", e);
+            return 0.0f;
         }
-
-        return difficulty;
     }
 
     @Override

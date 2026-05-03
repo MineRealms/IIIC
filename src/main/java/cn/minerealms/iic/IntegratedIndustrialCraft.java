@@ -79,7 +79,7 @@ public class IntegratedIndustrialCraft {
         if (FMLEnvironment.dist == Dist.CLIENT) {
             cn.minerealms.iic.client.ClientEventHandler.setup();
         }
-        MinecraftForge.EVENT_BUS.register(cn.minerealms.iic.forge.EventHandler.class);
+        // EventHandler uses @Mod.EventBusSubscriber annotation, no manual registration needed
         MinecraftForge.EVENT_BUS.register(HudUpdateService.class);
         MinecraftForge.EVENT_BUS.addListener(LaserEntity::enterChunk);
 
