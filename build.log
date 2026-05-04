@@ -13,48 +13,32 @@ Cannot deobfuscate dependency of type DefaultFileCollectionDependency_Decorated,
 > Task :downloadMcpConfig
 > Task :extractSrg UP-TO-DATE
 > Task :createMcpToSrg UP-TO-DATE
+
 > Task :compileJava
 注: SpongePowered MIXIN Annotation Processor Version=0.8.5 (MixinGradle Version=0.7.38)
 注: Supported obfuscation types: ObfuscationServiceMCP supports [notch] ObfuscationServiceFG3 supports [searge]
+H:\MinecraftMods\ImprovedMobs\src\main\java\cn\minerealms\iic\mixin\gunmod\WorkbenchBlockEntityMixin.java:23: 错误: Mixin target com.mrcrayfish.guns.blockentity.WorkbenchBlockEntity could not be found
+@Mixin(targets = "com.mrcrayfish.guns.blockentity.WorkbenchBlockEntity", remap = false)
+^
 注: Writing refmap to H:\MinecraftMods\ImprovedMobs\build\tmp\compileJava\compileJava-refmap.json
-H:\MinecraftMods\ImprovedMobs\src\main\java\cn\minerealms\iic\mixin\xaeromap\GuiMapMixin.java:37: 警告: Cannot find target for @Shadow field in xaero.map.gui.GuiMap
-    @Shadow
-    ^
-H:\MinecraftMods\ImprovedMobs\src\main\java\cn\minerealms\iic\mixin\xaeromap\GuiMapMixin.java:40: 警告: Cannot find target for @Shadow field in xaero.map.gui.GuiMap
-    @Shadow
-    ^
-H:\MinecraftMods\ImprovedMobs\src\main\java\cn\minerealms\iic\mixin\xaeromap\GuiMapMixin.java:43: 警告: Cannot find target for @Shadow method in xaero.map.gui.GuiMap
-    @Shadow
-    ^
 注: Writing refmap to H:\MinecraftMods\ImprovedMobs\build\tmp\compileJava\compileJava-refmap.json
 注: Writing searge composite mappings to H:\MinecraftMods\ImprovedMobs\build\tmp\compileJava\compileJava-mappings.tsrg
 注: Writing refmap to H:\MinecraftMods\ImprovedMobs\build\tmp\compileJava\compileJava-refmap.json
 注: Writing refmap to H:\MinecraftMods\ImprovedMobs\build\tmp\compileJava\compileJava-refmap.json
 注: Writing searge composite mappings to H:\MinecraftMods\ImprovedMobs\build\tmp\compileJava\compileJava-mappings.tsrg
-注: 某些输入文件使用或覆盖了已过时的 API。
-注: 有关详细信息, 请使用 -Xlint:deprecation 重新编译。
-3 个警告
+1 个错误
 
-> Task :addMixinsToJar
-> Task :processResources
-> Task :classes
-> Task :jar
-> Task :configureReobfTaskForReobfJar
-> Task :reobfJar
-> Task :configureReobfTaskForReobfJarJar
-> Task :addMixinsToJarJar
-> Task :jarJar SKIPPED
-> Task :reobfJarJar SKIPPED
-> Task :assemble
-> Task :compileTestJava NO-SOURCE
-> Task :processTestResources NO-SOURCE
-> Task :testClasses UP-TO-DATE
-> Task :test NO-SOURCE
-> Task :check UP-TO-DATE
-> Task :build
+> Task :compileJava FAILED
 
-> Task :copyToGameMods
-? JAR 已复制到游戏 mods 目录: G:\MinecraftGames\CTNH-BaopuEdition\.minecraft\versions\Create New Horizon\mods
+FAILURE: Build failed with an exception.
+
+* What went wrong:
+Execution failed for task ':compileJava'.
+> Compilation failed; see the compiler error output for details.
+
+* Try:
+> Run with --info option to get more log output.
+> Run with --scan to get full insights.
 
 Deprecated Gradle features were used in this build, making it incompatible with Gradle 9.0.
 
@@ -62,5 +46,5 @@ You can use '--warning-mode all' to show the individual deprecation warnings and
 
 For more on this, please refer to https://docs.gradle.org/8.8/userguide/command_line_interface.html#sec:command_line_warnings in the Gradle documentation.
 
-BUILD SUCCESSFUL in 1m 41s
-12 actionable tasks: 10 executed, 2 up-to-date
+BUILD FAILED in 50s
+4 actionable tasks: 2 executed, 2 up-to-date

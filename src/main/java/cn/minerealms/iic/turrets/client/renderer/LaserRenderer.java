@@ -84,6 +84,21 @@ public class LaserRenderer<T extends LaserEntity> extends EntityRenderer<T> {
      */
     private void renderWithBloom(Vec3 start, Vec3 end, PoseStack pPoseStack, MultiBufferSource pBuffer, LaserColor color, float time) {
         try {
+            // DEBUG: 检查Shimmer的OptiFine检测状态
+            try {
+                Class<?> mixinPluginClass = Class.forName("com.lowdragmc.shimmer.core.mixins.ShimmerMixinPlugin");
+                java.lang.reflect.Field isOptLoadField = mixinPluginClass.getField("IS_OPT_LOAD");
+                boolean isOptLoad = isOptLoadField.getBoolean(null);
+                if (isOptLoad) {
+                    IntegratedIndustrialCraft.LOGGER.error("[IIC-Turrets] CRITICAL: Shimmer IS_OPT_LOAD=true detected! This causes laser rendering to fail.");
+                    IntegratedIndustrialCraft.LOGGER.error("[IIC-Turrets] Shimmer thinks OptiFine is loaded, but it's not. Falling back to standard rendering.");
+                    renderStandard(start, end, pPoseStack, pBuffer, color, time);
+                    return;
+                }
+            } catch (Exception debugEx) {
+                IntegratedIndustrialCraft.LOGGER.debug("[IIC-Turrets] Could not check IS_OPT_LOAD status: " + debugEx.getMessage());
+            }
+
             // 关键：使用 Shimmer 的 RenderUtils.copyPoseStack()
             PoseStack finalStack = RenderUtils.copyPoseStack(pPoseStack);
 

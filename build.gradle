@@ -69,6 +69,14 @@ minecraft {
 
 sourceSets.main.resources { srcDir 'src/generated/resources' }
 
+// Add Gun Mod source for compilation (mixin target)
+sourceSets {
+    main {
+        compileClasspath += files("H:/MinecraftMods/MrCrayfishMod/MrCrayfishGunMod/src/main/java")
+    }
+}
+
+
 repositories {
     mavenLocal()
     maven { url = "https://maven.gtceu.com" }
@@ -138,6 +146,7 @@ mixin {
     add sourceSets.main, "integratedindustrialcraft.refmap.json"
     config "integratedindustrialcraft.mixins.json"
     config "integratedindustrialcraft.mixins.compat.json"
+    config "integratedindustrialcraft.mixins.gunmod.json"
 }
 
 jar {
@@ -150,7 +159,7 @@ jar {
                 "Implementation-Version"  : project.jar.archiveVersion,
                 "Implementation-Vendor"   : "flemmli97",
                 "Implementation-Timestamp": new Date().format("yyyy-MM-dd'T'HH:mm:ssZ"),
-                "MixinConfigs"            : "integratedindustrialcraft.mixins.json,integratedindustrialcraft.mixins.compat.json"
+                "MixinConfigs"            : "integratedindustrialcraft.mixins.json,integratedindustrialcraft.mixins.compat.json,integratedindustrialcraft.mixins.gunmod.json"
         ])
     }
 }
