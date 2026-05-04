@@ -18,6 +18,7 @@ public class IICCommand {
                 .then(HudCommand.register())
                 .then(DebugCommand.register())
                 .then(HordeCommand.register())
+                .then(SpawnCommand.register())
         );
     }
 }

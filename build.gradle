@@ -68,6 +68,7 @@ minecraft {
 }
 
 sourceSets.main.resources { srcDir 'src/generated/resources' }
+sourceSets.main.java { srcDir 'src/main/java' }
 
 // Add Gun Mod source for compilation (mixin target)
 sourceSets {
@@ -163,6 +164,26 @@ jar {
         ])
     }
 }
+
+jar.finalizedBy('reobfJar')
+
+// Workaround: After reobfJar, copy classes into the output jar
+task addClassesToJar {
+    dependsOn 'reobfJar'
+    doLast {
+        def jarFile = file("build/reobfJar/output.jar")
+        if (jarFile.exists()) {
+            exec {
+                commandLine 'jar', 'uf', jarFile.absolutePath, '-C', 'build/classes/java/main', '.'
+            }
+        }
+    }
+}
+
+jar.finalizedBy(addClassesToJar)
+
+// Include classes in reobfJar
+jar.finalizedBy('reobfJar')
 
 jar.finalizedBy('reobfJar')
 

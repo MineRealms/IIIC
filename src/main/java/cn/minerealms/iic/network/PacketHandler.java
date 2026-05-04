@@ -1,8 +1,6 @@
 package cn.minerealms.iic.network;
 
 import cn.minerealms.iic.IntegratedIndustrialCraft;
-import cn.minerealms.iic.scanner.network.PacketScannerRequest;
-import cn.minerealms.iic.scanner.network.PacketScannerResponse;
 import cn.minerealms.iic.turrets.common.packet.ModifyTurretTargetPacket;
 import net.minecraft.core.BlockPos;
 import net.minecraft.resources.ResourceLocation;
@@ -34,31 +32,12 @@ public class PacketHandler {
     }
 
     public static void register() {
-        // HUD sync packet
+        // Register HUD sync packet on BOTH server and client
+        // Client needs to receive, Server needs to encode
         INSTANCE.messageBuilder(SyncHudDataPacket.class, id(), NetworkDirection.PLAY_TO_CLIENT)
                 .decoder(SyncHudDataPacket::decode)
                 .encoder(SyncHudDataPacket::encode)
                 .consumerMainThread(SyncHudDataPacket::handle)
-                .add();
-
-        // Pollution visual effect test packet
-        INSTANCE.messageBuilder(TriggerPollutionEffectPacket.class, id(), NetworkDirection.PLAY_TO_CLIENT)
-                .decoder(TriggerPollutionEffectPacket::new)
-                .encoder(TriggerPollutionEffectPacket::encode)
-                .consumerMainThread(TriggerPollutionEffectPacket::handle)
-                .add();
-
-        // Scanner packets
-        INSTANCE.messageBuilder(PacketScannerRequest.class, id(), NetworkDirection.PLAY_TO_SERVER)
-                .decoder(PacketScannerRequest::fromNetwork)
-                .encoder(PacketScannerRequest::toNetwork)
-                .consumerMainThread(PacketScannerRequest::handle)
-                .add();
-
-        INSTANCE.messageBuilder(PacketScannerResponse.class, id(), NetworkDirection.PLAY_TO_CLIENT)
-                .decoder(PacketScannerResponse::fromNetwork)
-                .encoder(PacketScannerResponse::toNetwork)
-                .consumerMainThread(PacketScannerResponse::handle)
                 .add();
 
         // Turret packets
