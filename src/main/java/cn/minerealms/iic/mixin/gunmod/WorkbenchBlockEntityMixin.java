@@ -238,4 +238,42 @@ public abstract class WorkbenchBlockEntityMixin extends BlockEntity implements I
         this.iic$recipeCost = 0;
         this.setChanged();
     }
+
+    // ==================== Tick Logic ====================
+
+    /**
+     * Tick method to handle energy consumption and progress tracking.
+     * This should be called every tick when the workbench is crafting.
+     */
+    @Unique
+    public void iic$tick() {
+        if (!this.iic$isCrafting) {
+            return;
+        }
+
+        // Calculate energy per tick
+        int energyPerTick = this.iic$maxProgress > 0 ?
+            (this.iic$recipeCost + this.iic$maxProgress - 1) / this.iic$maxProgress : 0;
+
+        // Check if we have enough energy
+        if (this.iic$storedEnergy < energyPerTick) {
+            // Not enough energy, pause crafting
+            return;
+        }
+
+        // Consume energy
+        this.iic$storedEnergy -= energyPerTick;
+
+        // Increment progress
+        this.iic$progress++;
+
+        // Mark as changed for sync
+        this.setChanged();
+
+        // Check if crafting is complete
+        if (this.iic$progress >= this.iic$maxProgress) {
+            // Crafting complete - the handler will detect this and drop the item
+            // Don't reset here, let the handler do it
+        }
+    }
 }

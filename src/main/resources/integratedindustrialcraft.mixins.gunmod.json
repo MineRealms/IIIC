@@ -6,7 +6,8 @@
   "refmap": "integratedindustrialcraft.refmap.json",
   "plugin": "cn.minerealms.iic.mixin.gunmod.GunModMixinPlugin",
   "mixins": [
-    "WorkbenchBlockEntityMixin"
+    "WorkbenchBlockEntityMixin",
+    "WorkbenchBlockMixin"
   ],
   "client": [
   ],
