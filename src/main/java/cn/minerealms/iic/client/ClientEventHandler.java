@@ -1,7 +1,6 @@
 package cn.minerealms.iic.client;
 
 import cn.minerealms.iic.client.hud.DifficultyHudRenderer;
-import cn.minerealms.iic.scanner.client.ScannerScreen;
 import cn.minerealms.iic.turrets.client.renderer.LaserRenderer;
 import cn.minerealms.iic.turrets.client.renderer.LaserTurretRenderer;
 import cn.minerealms.iic.turrets.common.block_entity.LaserTurretBlockEntity;

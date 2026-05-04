@@ -3,7 +3,7 @@ package cn.minerealms.iic;
 import cn.minerealms.iic.industrial.*;
 import cn.minerealms.iic.integration.alexscaves.AlexsCavesIntegration;
 import cn.minerealms.iic.network.PacketHandler;
-import cn.minerealms.iic.scanner.ScannerItem;
+
 import cn.minerealms.iic.server.HudUpdateService;
 import cn.minerealms.iic.turrets.MekanismTurretsConfig;
 import cn.minerealms.iic.turrets.common.block_entity.FlameThrowerTurretBlockEntity;
@@ -42,9 +42,6 @@ public class IntegratedIndustrialCraft {
     public static final String MODID = "integratedindustrialcraft";
     public static final Logger LOGGER = LoggerFactory.getLogger("IntegratedIndustrialCraft");
 
-    public static final DeferredRegister<Item> ITEMS = DeferredRegister.create(ForgeRegistries.ITEMS, MODID);
-    public static final RegistryObject<Item> TERRAIN_SCANNER = ITEMS.register("terrain_scanner", ScannerItem::new);
-
     public IntegratedIndustrialCraft() {
         LOGGER.info("Initializing Integrated Industrial Craft (IIC)");
 
@@ -63,7 +60,6 @@ public class IntegratedIndustrialCraft {
         IEventBus modBus = FMLJavaModLoadingContext.get().getModEventBus();
         modBus.addListener(this::setup);
         modBus.addListener(this::onConfigLoad);
-        ITEMS.register(modBus);
 
         // Register Mekanism Turrets components
         BlockRegistry.BLOCKS.register(modBus);

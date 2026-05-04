@@ -10,7 +10,6 @@ import net.minecraft.client.gui.GuiGraphics;
 import net.minecraft.client.renderer.GameRenderer;
 import net.minecraft.world.level.ChunkPos;
 import org.joml.Matrix4f;
-import xaero.map.gui.GuiMap;
 
 import java.util.Map;
 
@@ -34,9 +33,9 @@ public class PollutionOverlayRenderer {
      * low-pollution chunks when zoomed out.
      *
      * @param guiGraphics The GUI graphics context
-     * @param guiMap The GuiMap instance
+     * @param guiMap The GuiMap instance (passed as Object to avoid early class loading)
      */
-    public static void render(GuiGraphics guiGraphics, GuiMap guiMap) {
+    public static void render(GuiGraphics guiGraphics, Object guiMap) {
         Map<ChunkPos, Double> pollutedChunks = PollutionOverlayAPI.getAllPollutedChunks();
         if (pollutedChunks.isEmpty()) {
             return;
@@ -50,8 +49,19 @@ public class PollutionOverlayRenderer {
         double cameraX = accessor.iic_getCameraX();
         double cameraZ = accessor.iic_getCameraZ();
         double scale = accessor.iic_getScale();
-        int screenWidth = guiMap.width;
-        int screenHeight = guiMap.height;
+
+        // Get screen dimensions via reflection to avoid importing GuiMap
+        int screenWidth;
+        int screenHeight;
+        try {
+            java.lang.reflect.Field widthField = guiMap.getClass().getField("width");
+            java.lang.reflect.Field heightField = guiMap.getClass().getField("height");
+            screenWidth = widthField.getInt(guiMap);
+            screenHeight = heightField.getInt(guiMap);
+        } catch (Exception e) {
+            IndustrialLogger.error("Failed to get screen dimensions from GuiMap", e);
+            return;
+        }
 
         // Set up rendering state
         RenderSystem.enableBlend();
@@ -193,18 +203,28 @@ public class PollutionOverlayRenderer {
      * <p>
      * This is used for hover tooltips.
      *
-     * @param guiMap The GuiMap instance
+     * @param guiMap The GuiMap instance (passed as Object to avoid early class loading)
      * @param mouseX Mouse X position
      * @param mouseY Mouse Y position
      * @return Pollution value, or 0.0 if no pollution
      */
-    public static double getPollutionAtMouse(GuiMap guiMap, int mouseX, int mouseY) {
+    public static double getPollutionAtMouse(Object guiMap, int mouseX, int mouseY) {
         GuiMapAccessor accessor = (GuiMapAccessor) guiMap;
         double cameraX = accessor.iic_getCameraX();
         double cameraZ = accessor.iic_getCameraZ();
         double scale = accessor.iic_getScale();
-        int screenWidth = guiMap.width;
-        int screenHeight = guiMap.height;
+
+        // Get screen dimensions via reflection
+        int screenWidth;
+        int screenHeight;
+        try {
+            java.lang.reflect.Field widthField = guiMap.getClass().getField("width");
+            java.lang.reflect.Field heightField = guiMap.getClass().getField("height");
+            screenWidth = widthField.getInt(guiMap);
+            screenHeight = heightField.getInt(guiMap);
+        } catch (Exception e) {
+            return 0.0;
+        }
 
         // Convert mouse position to world coordinates
         double worldX = (mouseX - screenWidth / 2.0) / scale + cameraX;

@@ -92,8 +92,8 @@ public class HudUpdateService {
         // 调试日志 - 显示扫描结果
         if (IndustrialLogger.isDebugEnabled() && level.getGameTime() % 100 == 0) {
             IndustrialLogger.info(String.format(
-                    "cd, Found %d machines, median tier: %.2f, industrial bonus: %.3f",
-                    scanRadius, machineResult.tiers().size(), medianTier, industrialBonus));
+                    "HUD: Found %d machines, median tier: %.2f, industrial bonus: %.3f",
+                    machineResult.tiers().size(), medianTier, industrialBonus));
             if (!machineResult.tiers().isEmpty()) {
                 IndustrialLogger.info("Machine tiers: " + machineResult.tiers());
             }

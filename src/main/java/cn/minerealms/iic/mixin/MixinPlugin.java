@@ -21,6 +21,7 @@ public class MixinPlugin implements IMixinConfigPlugin {
 
     private static final Logger LOGGER = LogManager.getLogger("IIC-MixinPlugin");
     private static final String ENHANCED_VISUALS_CLASS = "team.creative.enhancedvisuals.client.VisualManager";
+    private static final String XAEROS_WORLDMAP_CLASS = "xaero.map.gui.GuiMap";
 
     @Override
     public void onLoad(String mixinPackage) {
@@ -42,6 +43,14 @@ public class MixinPlugin implements IMixinConfigPlugin {
             return present;
         }
 
+        // Check if XaerosWorldMap mixins should be applied
+        if (mixinClassName.contains(".xaeromap.")) {
+            boolean present = isClassPresent(XAEROS_WORLDMAP_CLASS);
+            LOGGER.info("[IIC-MixinPlugin] Checking XaerosWorldMap mixin: {} -> Target: {} -> Present: {}",
+                mixinClassName, targetClassName, present);
+            return present;
+        }
+
         // Apply all other mixins by default
         return true;
     }
@@ -58,8 +67,8 @@ public class MixinPlugin implements IMixinConfigPlugin {
 
     @Override
     public void preApply(String targetClassName, ClassNode targetClass, String mixinClassName, IMixinInfo mixinInfo) {
-        if (mixinClassName.contains(".enhancedvisuals.")) {
-            LOGGER.info("[IIC-MixinPlugin] Applying EnhancedVisuals mixin: {} to {}", mixinClassName, targetClassName);
+        if (mixinClassName.contains(".enhancedvisuals.") || mixinClassName.contains(".xaeromap.")) {
+            LOGGER.info("[IIC-MixinPlugin] Applying mixin: {} to {}", mixinClassName, targetClassName);
             LOGGER.info("[IIC-MixinPlugin] Target class methods:");
             targetClass.methods.forEach(method -> {
                 LOGGER.info("[IIC-MixinPlugin]   - {} {}", method.name, method.desc);
@@ -69,17 +78,17 @@ public class MixinPlugin implements IMixinConfigPlugin {
 
     @Override
     public void postApply(String targetClassName, ClassNode targetClass, String mixinClassName, IMixinInfo mixinInfo) {
-        if (mixinClassName.contains(".enhancedvisuals.")) {
-            LOGGER.info("[IIC-MixinPlugin] Successfully applied EnhancedVisuals mixin: {} to {}", mixinClassName, targetClassName);
+        if (mixinClassName.contains(".enhancedvisuals.") || mixinClassName.contains(".xaeromap.")) {
+            LOGGER.info("[IIC-MixinPlugin] Successfully applied mixin: {} to {}", mixinClassName, targetClassName);
             // Mark as loaded in tracker
             try {
                 Class<?> trackerClass = Class.forName("cn.minerealms.iic.util.MixinLoadTracker");
-                java.lang.reflect.Method markLoaded = trackerClass.getMethod("markLoaded", String.class);
+                java.lang.reflect.Method markApplied = trackerClass.getMethod("markApplied", String.class);
                 String simpleName = mixinClassName.substring(mixinClassName.lastIndexOf('.') + 1);
-                markLoaded.invoke(null, simpleName);
-                LOGGER.info("[IIC-MixinPlugin] Marked {} as LOADED in tracker", simpleName);
+                markApplied.invoke(null, simpleName);
+                LOGGER.info("[IIC-MixinPlugin] Marked {} as APPLIED in tracker", simpleName);
             } catch (Exception e) {
-                LOGGER.error("[IIC-MixinPlugin] Failed to mark mixin as loaded", e);
+                LOGGER.error("[IIC-MixinPlugin] Failed to mark mixin as applied", e);
             }
         }
     }

@@ -694,6 +694,98 @@ public class TriAxisConfig {
         4.0   // UHV (Tier 9) - 极限挑战
     };
 
+    // ========== ImprovedMobs Integration ==========
+
+    /**
+     * Enable takeover of ImprovedMobs difficulty system.
+     * When true, IIC completely controls difficulty calculation (IntegrationType.ON).
+     * When false, IIC adds to ImprovedMobs base difficulty (IntegrationType.ADD).
+     * Default: true (recommended)
+     */
+    public static boolean takeoverImprovedMobsDifficulty = true;
+
+    /**
+     * Target maximum difficulty value for ImprovedMobs integration (50-500).
+     * This is the difficulty value at maximum progression (UV tier + max time + max pollution).
+     * ImprovedMobs expects 0-250 range, where:
+     * - 50: Mobs start breaking blocks (if difficultyBreak=50)
+     * - 100: Moderate difficulty, noticeable attribute increases
+     * - 150: High difficulty, significant attribute increases
+     * - 250: Maximum difficulty, extreme attribute increases
+     * Default: 250
+     */
+    public static double targetMaxDifficulty = 250.0;
+
+    /**
+     * Real-world days to reach target difficulty at maximum progression (10-90).
+     * This controls how fast difficulty grows over time.
+     * Example: 30 days = if you reach UV tier in 30 days, difficulty will be at target.
+     * Default: 30 days
+     */
+    public static double realWorldDaysToMax = 30.0;
+
+    // ========== Mob Spawn Enhancement ==========
+
+    /**
+     * Enable mob spawn enhancement system.
+     * When enabled, spawn rates are modified based on difficulty.
+     * Default: false (disabled by default, enable for testing)
+     */
+    public static boolean enableSpawnEnhancement = false;
+
+    /**
+     * Global spawn rate multiplier (0.0-10.0).
+     * Base chance for mobs to spawn.
+     * - 1.0 = normal spawn rate
+     * - 2.0 = double spawn rate
+     * - 0.5 = half spawn rate
+     * Default: 1.0
+     */
+    public static double spawnMultiplier = 1.0;
+
+    /**
+     * Additional spawn chance per difficulty point (0.0-1.0).
+     * Higher difficulty = more spawns.
+     * Formula: spawnChance = spawnMultiplier + (difficulty × difficultySpawnBonus)
+     * Example: difficulty=100, bonus=0.001 → +0.1 spawn chance
+     * Default: 0.001 (0.1% per difficulty point)
+     */
+    public static double difficultySpawnBonus = 0.001;
+
+    /**
+     * Maximum spawn chance cap (0.0-10.0).
+     * Prevents spawn chance from exceeding this value.
+     * Default: 3.0 (up to 3x normal spawn rate)
+     */
+    public static double maxSpawnChance = 3.0;
+
+    /**
+     * Enable forced spawning based on difficulty.
+     * When enabled, additional mobs are force-spawned in high-difficulty areas.
+     * Default: false
+     */
+    public static boolean enableForcedSpawning = false;
+
+    /**
+     * Difficulty threshold for forced spawning (50-250).
+     * When difficulty exceeds this, forced spawning may occur.
+     * Default: 150.0
+     */
+    public static double forcedSpawnThreshold = 150.0;
+
+    /**
+     * Forced spawn chance per second (0.0-1.0).
+     * Probability of triggering forced spawn each second.
+     * Default: 0.01 (1% per second)
+     */
+    public static double forcedSpawnChance = 0.01;
+
+    /**
+     * Number of mobs to spawn per forced spawn event (1-20).
+     * Default: 3
+     */
+    public static int forcedSpawnCount = 3;
+
     // ========== Debug Settings ==========
 
     /**
@@ -1400,6 +1492,22 @@ public class TriAxisConfig {
 
                 // 预设和调试
                 difficultyPreset = props.getProperty("difficultyPreset", difficultyPreset);
+                // ImprovedMobs Integration
+                takeoverImprovedMobsDifficulty = Boolean.parseBoolean(props.getProperty("takeoverImprovedMobsDifficulty", String.valueOf(takeoverImprovedMobsDifficulty)));
+                targetMaxDifficulty = Double.parseDouble(props.getProperty("targetMaxDifficulty", String.valueOf(targetMaxDifficulty)));
+                realWorldDaysToMax = Double.parseDouble(props.getProperty("realWorldDaysToMax", String.valueOf(realWorldDaysToMax)));
+
+                // Mob Spawn Enhancement
+                enableSpawnEnhancement = Boolean.parseBoolean(props.getProperty("enableSpawnEnhancement", String.valueOf(enableSpawnEnhancement)));
+                spawnMultiplier = Double.parseDouble(props.getProperty("spawnMultiplier", String.valueOf(spawnMultiplier)));
+                difficultySpawnBonus = Double.parseDouble(props.getProperty("difficultySpawnBonus", String.valueOf(difficultySpawnBonus)));
+                maxSpawnChance = Double.parseDouble(props.getProperty("maxSpawnChance", String.valueOf(maxSpawnChance)));
+                enableForcedSpawning = Boolean.parseBoolean(props.getProperty("enableForcedSpawning", String.valueOf(enableForcedSpawning)));
+                forcedSpawnThreshold = Double.parseDouble(props.getProperty("forcedSpawnThreshold", String.valueOf(forcedSpawnThreshold)));
+                forcedSpawnChance = Double.parseDouble(props.getProperty("forcedSpawnChance", String.valueOf(forcedSpawnChance)));
+                forcedSpawnCount = Integer.parseInt(props.getProperty("forcedSpawnCount", String.valueOf(forcedSpawnCount)));
+
+                // Debug Options
                 enableDebugLines = Boolean.parseBoolean(props.getProperty("enableDebugLines", String.valueOf(enableDebugLines)));
                 enableDifficultyLogging = Boolean.parseBoolean(props.getProperty("enableDifficultyLogging", String.valueOf(enableDifficultyLogging)));
                 enableSporeDebug = Boolean.parseBoolean(props.getProperty("enableSporeDebug", String.valueOf(enableSporeDebug)));
@@ -1621,6 +1729,22 @@ public class TriAxisConfig {
 
         // 预设和调试
         props.setProperty("difficultyPreset", difficultyPreset);
+        // ImprovedMobs Integration
+        props.setProperty("takeoverImprovedMobsDifficulty", String.valueOf(takeoverImprovedMobsDifficulty));
+        props.setProperty("targetMaxDifficulty", String.valueOf(targetMaxDifficulty));
+        props.setProperty("realWorldDaysToMax", String.valueOf(realWorldDaysToMax));
+
+        // Mob Spawn Enhancement
+        props.setProperty("enableSpawnEnhancement", String.valueOf(enableSpawnEnhancement));
+        props.setProperty("spawnMultiplier", String.valueOf(spawnMultiplier));
+        props.setProperty("difficultySpawnBonus", String.valueOf(difficultySpawnBonus));
+        props.setProperty("maxSpawnChance", String.valueOf(maxSpawnChance));
+        props.setProperty("enableForcedSpawning", String.valueOf(enableForcedSpawning));
+        props.setProperty("forcedSpawnThreshold", String.valueOf(forcedSpawnThreshold));
+        props.setProperty("forcedSpawnChance", String.valueOf(forcedSpawnChance));
+        props.setProperty("forcedSpawnCount", String.valueOf(forcedSpawnCount));
+
+        // Debug Options
         props.setProperty("enableDebugLines", String.valueOf(enableDebugLines));
         props.setProperty("enableDifficultyLogging", String.valueOf(enableDifficultyLogging));
         props.setProperty("enableSporeDebug", String.valueOf(enableSporeDebug));
