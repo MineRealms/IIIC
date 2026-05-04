@@ -11,6 +11,7 @@
     "ServerPlayHandlerMixin"
   ],
   "client": [
+    "WorkbenchScreenMixin"
   ],
   "injectors": {
     "defaultRequire": 0
