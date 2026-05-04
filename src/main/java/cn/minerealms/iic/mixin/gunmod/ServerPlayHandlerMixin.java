@@ -90,19 +90,13 @@ public class ServerPlayHandlerMixin {
             ItemStack resultStack = (ItemStack) recipe.getClass().getMethod("getItem").invoke(recipe);
             String itemId = resultStack.getItem().toString().toLowerCase();
 
-            int maxProgress;
-            int recipeCost;
-
             // Check if it's ammo or weapon
-            if (itemId.contains("ammo") || itemId.contains("shell") || itemId.contains("round") || itemId.contains("bullet")) {
-                // Ammo: 3 seconds (60 ticks), 512 EU
-                maxProgress = 60;
-                recipeCost = 512;
-            } else {
-                // Weapon: 12 seconds (240 ticks), 2048 EU
-                maxProgress = 240;
-                recipeCost = 2048;
-            }
+            boolean isAmmo = itemId.contains("ammo") || itemId.contains("shell") ||
+                           itemId.contains("round") || itemId.contains("bullet");
+
+            // Get costs from config
+            int maxProgress = cn.minerealms.iic.integration.gunmod.GunModRecipeConfig.getCraftingTime(id, isAmmo);
+            int recipeCost = cn.minerealms.iic.integration.gunmod.GunModRecipeConfig.getEnergyCost(id, isAmmo);
 
             // Try to start crafting
             if (!energyWorkbench.iic$startCrafting(maxProgress, recipeCost)) {

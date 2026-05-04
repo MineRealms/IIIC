@@ -95,6 +95,12 @@ public class IntegratedIndustrialCraft {
         // Register network packets (all packets registered here)
         PacketHandler.register();
 
+        // Load Gun Mod workbench energy config
+        if (ModList.get().isLoaded("cgm")) {
+            LOGGER.info("Gun Mod detected, loading workbench energy config");
+            cn.minerealms.iic.integration.gunmod.GunModRecipeConfig.load();
+        }
+
         // Initialize turret config references
         initializeTurretConfigs();
 
