@@ -3,11 +3,15 @@ package cn.minerealms.iic.mixin.gunmod;
 import cn.minerealms.iic.integration.gunmod.DummyWorkbenchBlockEntity;
 import cn.minerealms.iic.integration.gunmod.IEnergyWorkbench;
 import net.minecraft.core.BlockPos;
+import net.minecraft.core.NonNullList;
 import net.minecraft.nbt.CompoundTag;
+import net.minecraft.world.item.DyeItem;
+import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.level.block.entity.BlockEntity;
 import net.minecraft.world.level.block.entity.BlockEntityType;
 import net.minecraft.world.level.block.state.BlockState;
 import org.spongepowered.asm.mixin.Mixin;
+import org.spongepowered.asm.mixin.Shadow;
 import org.spongepowered.asm.mixin.Unique;
 import org.spongepowered.asm.mixin.injection.At;
 import org.spongepowered.asm.mixin.injection.Inject;
@@ -25,6 +29,22 @@ import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
  */
 @Mixin(value = DummyWorkbenchBlockEntity.class, remap = false)
 public abstract class WorkbenchBlockEntityMixin extends BlockEntity implements IEnergyWorkbench {
+
+    // ==================== Shadow Methods ====================
+
+    /**
+     * Shadow the getInventory method from the actual WorkbenchBlockEntity.
+     * This will be available at runtime when targeting the real class.
+     */
+    @Shadow
+    public abstract NonNullList<ItemStack> getInventory();
+
+    /**
+     * Shadow the saveAdditional method to access NBT data.
+     */
+    @Shadow
+    protected abstract void saveAdditional(CompoundTag tag);
+
 
     // ==================== Energy Storage ====================
 
@@ -92,6 +112,15 @@ public abstract class WorkbenchBlockEntityMixin extends BlockEntity implements I
         iicData.putInt("MaxProgress", this.iic$maxProgress);
         iicData.putInt("RecipeCost", this.iic$recipeCost);
         iicData.putBoolean("IsCrafting", this.iic$isCrafting);
+
+        // Also save pending recipe data if present
+        if (tag.contains("IICPendingRecipeId")) {
+            iicData.putString("PendingRecipeId", tag.getString("IICPendingRecipeId"));
+            if (tag.contains("IICPendingResult")) {
+                iicData.put("PendingResult", tag.get("IICPendingResult"));
+            }
+        }
+
         tag.put("IICWorkbenchData", iicData);
     }
 
@@ -108,6 +137,14 @@ public abstract class WorkbenchBlockEntityMixin extends BlockEntity implements I
             this.iic$maxProgress = iicData.getInt("MaxProgress");
             this.iic$recipeCost = iicData.getInt("RecipeCost");
             this.iic$isCrafting = iicData.getBoolean("IsCrafting");
+
+            // Also load pending recipe data if present
+            if (iicData.contains("PendingRecipeId")) {
+                tag.putString("IICPendingRecipeId", iicData.getString("PendingRecipeId"));
+                if (iicData.contains("PendingResult")) {
+                    tag.put("IICPendingResult", iicData.get("PendingResult"));
+                }
+            }
         }
     }
 
@@ -272,8 +309,76 @@ public abstract class WorkbenchBlockEntityMixin extends BlockEntity implements I
 
         // Check if crafting is complete
         if (this.iic$progress >= this.iic$maxProgress) {
-            // Crafting complete - the handler will detect this and drop the item
-            // Don't reset here, let the handler do it
+            // Crafting complete - drop the item
+            iic$completeCrafting();
         }
+    }
+
+    /**
+     * Complete the crafting operation and drop the result item.
+     */
+    @Unique
+    private void iic$completeCrafting() {
+        if (this.level == null || this.level.isClientSide) {
+            return;
+        }
+
+        try {
+            // Load the pending recipe data from NBT
+            CompoundTag tag = new CompoundTag();
+            this.saveAdditional(tag);
+
+            if (tag.contains("IICWorkbenchData")) {
+                CompoundTag iicData = tag.getCompound("IICWorkbenchData");
+
+                if (iicData.contains("PendingRecipeId")) {
+                    String recipeId = iicData.getString("PendingRecipeId");
+                    CompoundTag resultTag = iicData.getCompound("PendingResult");
+
+                    // Load the result item
+                    ItemStack resultStack = ItemStack.of(resultTag);
+
+                    if (!resultStack.isEmpty()) {
+                        // Apply dye color if applicable
+                        ItemStack dyeStack = this.getInventory().get(0);
+                        if (dyeStack.getItem() instanceof DyeItem dyeItem) {
+                            try {
+                                Class<?> iColoredClass = Class.forName("com.mrcrayfish.guns.item.IColored");
+                                boolean isDyeable = (boolean) iColoredClass.getMethod("isDyeable", ItemStack.class)
+                                    .invoke(null, resultStack);
+
+                                if (isDyeable && iColoredClass.isInstance(resultStack.getItem())) {
+                                    int color = dyeItem.getDyeColor().getTextColor();
+                                    iColoredClass.getMethod("setColor", ItemStack.class, int.class)
+                                        .invoke(resultStack.getItem(), resultStack, color);
+                                    this.getInventory().set(0, ItemStack.EMPTY);
+                                }
+                            } catch (Exception e) {
+                                // Ignore dye errors
+                            }
+                        }
+
+                        // Drop the item
+                        net.minecraft.world.Containers.dropItemStack(
+                            this.level,
+                            this.worldPosition.getX() + 0.5,
+                            this.worldPosition.getY() + 1.125,
+                            this.worldPosition.getZ() + 0.5,
+                            resultStack
+                        );
+                    }
+
+                    // Clear pending recipe data
+                    iicData.remove("PendingRecipeId");
+                    iicData.remove("PendingResult");
+                    this.setChanged();
+                }
+            }
+        } catch (Exception e) {
+            System.err.println("[IIC] Error completing workbench craft: " + e.getMessage());
+        }
+
+        // Reset crafting state
+        this.iic$resetCrafting();
     }
 }

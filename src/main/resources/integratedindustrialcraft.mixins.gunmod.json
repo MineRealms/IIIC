@@ -7,7 +7,8 @@
   "plugin": "cn.minerealms.iic.mixin.gunmod.GunModMixinPlugin",
   "mixins": [
     "WorkbenchBlockEntityMixin",
-    "WorkbenchBlockMixin"
+    "WorkbenchBlockMixin",
+    "ServerPlayHandlerMixin"
   ],
   "client": [
   ],
