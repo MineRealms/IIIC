@@ -22,6 +22,9 @@ Features:
 - Terrain scanner tool
 '''
 
+[[mixins]]
+config="integratedindustrialcraft.mixins.json"
+
 [[dependencies.integratedindustrialcraft]]
 modId="forge"
 mandatory=true
@@ -39,7 +42,7 @@ side="BOTH"
 [[dependencies.integratedindustrialcraft]]
 modId="gtceu"
 mandatory=false
-versionRange="[7.2.0,)"
+versionRange="[1.8.0,)"
 ordering="AFTER"
 side="BOTH"
 

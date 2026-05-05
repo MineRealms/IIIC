@@ -144,7 +144,6 @@ dependencies {
 }
 
 mixin {
-    add sourceSets.main, "integratedindustrialcraft.refmap.json"
     config "integratedindustrialcraft.mixins.json"
     config "integratedindustrialcraft.mixins.compat.json"
     config "integratedindustrialcraft.mixins.gunmod.json"

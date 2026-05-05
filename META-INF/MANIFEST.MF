@@ -1,0 +1,11 @@
+Manifest-Version: 1.0
+Specification-Title: integratedindustrialcraft
+Specification-Vendor: flemmli97
+Specification-Version: 1
+Implementation-Title: IntegratedIndustrialCraft
+Implementation-Version: 1.0.0
+Implementation-Vendor: flemmli97
+Implementation-Timestamp: 2026-05-05T10:43:23+0800
+MixinConfigs: integratedindustrialcraft.mixins.json,integratedindustrial
+ craft.mixins.compat.json,integratedindustrialcraft.mixins.gunmod.json
+

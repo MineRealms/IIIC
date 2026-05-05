@@ -3,8 +3,6 @@
   "minVersion": "0.8",
   "package": "cn.minerealms.iic.mixin.gunmod",
   "compatibilityLevel": "JAVA_17",
-  "refmap": "integratedindustrialcraft.refmap.json",
-  "plugin": "cn.minerealms.iic.mixin.gunmod.GunModMixinPlugin",
   "mixins": [
     "WorkbenchBlockEntityMixin",
     "WorkbenchBlockMixin",
