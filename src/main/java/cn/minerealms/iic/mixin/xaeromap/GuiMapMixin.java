@@ -45,10 +45,10 @@ public abstract class GuiMapMixin {
     @Shadow
     public double scale;
 
-    @Shadow
+    @Shadow(remap = true)
     public int width;
 
-    @Shadow
+    @Shadow(remap = true)
     public int height;
 
     @Shadow
