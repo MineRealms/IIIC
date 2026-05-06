@@ -1,6 +1,7 @@
 package cn.minerealms.iic.forge;
 
 import cn.minerealms.iic.command.IICCommand;
+import cn.minerealms.iic.difficulty.DifficultyDebugLogger;
 import cn.minerealms.iic.difficulty.DifficultyManager;
 import cn.minerealms.iic.integration.alexscaves.AlexsCavesIntegration;
 import cn.minerealms.iic.threat.horde.HordeIntegrationManager;
@@ -36,7 +37,7 @@ public class EventHandler {
             // Tick Pollution system only for dimensions with players
             // Avoid scanning empty dimensions (performance optimization)
             event.getServer().getAllLevels().forEach(level -> {
-                // Only tick pollution for dimensions that have players
+                // Only tick pollution dimensions that have players
                 boolean hasPlayers = !level.players().isEmpty();
                 if (hasPlayers) {
                     cn.minerealms.iic.pollution.PollutionManager.tick(level);
@@ -44,6 +45,13 @@ public class EventHandler {
                 HordeIntegrationManager.tick(level);
                 AlexsCavesIntegration.tick(level);
             });
+
+            // Independent debug logger - log every 2 minutes regardless of HUD
+            if (event.getServer().getPlayerCount() > 0) {
+                event.getServer().getPlayerList().getPlayers().forEach(player -> {
+                    DifficultyDebugLogger.tick(player.serverLevel(), player.chunkPosition());
+                });
+            }
         }
     }
 }

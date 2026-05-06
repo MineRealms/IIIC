@@ -20,8 +20,8 @@ public class TriAxisDifficultyManager {
 
     // 缓存上一次的难度，用于平滑过渡和限速 (ChunkPos -> Difficulty)
     // 使用 ChunkPos 而不是 BlockPos，避免玩家移动/怪物位置变化导致缓存失效
-    private static final Map<ChunkPos, Double> difficultyCache = new HashMap<>();
-    private static final Map<ChunkPos, Double> pollutionEmaCache = new HashMap<>();
+    static final Map<ChunkPos, Double> difficultyCache = new HashMap<>();
+    static final Map<ChunkPos, Double> pollutionEmaCache = new HashMap<>();
 
     // 记录上次更新时间，用于基于真实时间的限速 (ChunkPos -> GameTime)
     private static final Map<ChunkPos, Long> lastUpdateTime = new HashMap<>();
@@ -35,6 +35,7 @@ public class TriAxisDifficultyManager {
     private static ChunkPos lastScanChunk = null;
     private static DifficultyState lastScanResult = null;
     private static long lastScanTick = -1;
+    private static final Map<ChunkPos, Long> lastMcDayTickUpdate = new HashMap<>();
 
     public static class DifficultyState {
         public final double totalDifficulty; // D
@@ -74,9 +75,15 @@ public class TriAxisDifficultyManager {
                     // 返回缓存值，避免扫描
                     Double pollutionEma = pollutionEmaCache.getOrDefault(chunkPos, 0.0);
                     double P = pollutionEma / TriAxisConfig.pollutionDenominator;
-                    return new DifficultyState(cached, 0.5, 0.0, P);
+                    // 计算当前的T值
+                    long mcDays = level.getDayTime() / 24000L;
+                    double mcDaysPerRealDay = 24.0 * 3.0;
+                    double targetMCDays = TriAxisConfig.realWorldDaysToMax * mcDaysPerRealDay;
+                    double tRaw = Math.log1p(mcDays / TriAxisConfig.baseDays) / Math.log1p(targetMCDays / TriAxisConfig.baseDays);
+                    double T = Mth.clamp(tRaw, 0.0, 1.0);
+                    return new DifficultyState(cached, T, 0.0, P);
                 }
-                // 无缓存，返回默认值（基于时间）
+                // 无缓存，返回默认值（基于时间）并写入缓存
                 long mcDays = level.getDayTime() / 24000L;
                 double mcDaysPerRealDay = 24.0 * 3.0;
                 double targetMCDays = TriAxisConfig.realWorldDaysToMax * mcDaysPerRealDay;
@@ -85,6 +92,10 @@ public class TriAxisDifficultyManager {
                 double Base = TriAxisConfig.baseMin + (TriAxisConfig.baseMax - TriAxisConfig.baseMin) * T;
                 Double pollutionEma = pollutionEmaCache.getOrDefault(chunkPos, 0.0);
                 double P = pollutionEma / TriAxisConfig.pollutionDenominator;
+                // 写入缓存，避免下次重复计算
+                difficultyCache.put(chunkPos, Base);
+                lastUpdateTime.put(chunkPos, level.getGameTime());
+                lastMcDayTickUpdate.put(chunkPos, level.getDayTime());
                 return new DifficultyState(Base, T, 0.0, P);
             }
 
@@ -129,8 +140,9 @@ public class TriAxisDifficultyManager {
                     "Voltage Axis: medianTier=%d, effectiveMaxTier=%d, V=%.4f",
                     medianTier, effectiveMaxTier, V));
             } else {
-                V = T; // 降级处理
-                IndustrialLogger.infoDifficulty("GTCEu NOT detected, using fallback V=T");
+                // 修复：没有GT CEu时，V应该设为0而不是T
+                V = 0.0;
+                IndustrialLogger.infoDifficulty("GTCEu NOT detected, V=0.0");
             }
 
             // Scale multiplier: 1.0 ~ 4.5 (exponential growth with voltage tier)
@@ -189,6 +201,7 @@ public class TriAxisDifficultyManager {
             if (lastTimeObj == null) {
                 difficultyCache.put(chunkPos, targetD);
                 lastUpdateTime.put(chunkPos, currentTime);
+                lastMcDayTickUpdate.put(chunkPos, level.getDayTime());
 
                 IndustrialLogger.infoDifficulty(String.format(
                     "First calculation for chunk %s: setting difficulty to %.4f", chunkPos, targetD));
@@ -221,6 +234,7 @@ public class TriAxisDifficultyManager {
 
                 difficultyCache.put(chunkPos, finalD);
                 lastUpdateTime.put(chunkPos, currentTime);
+                lastMcDayTickUpdate.put(chunkPos, currentTime);
 
                 IndustrialLogger.infoDifficulty(String.format(
                     "Rate Limiting: currentD=%.4f, targetD=%.4f, delta=%.4f, finalD=%.4f, ticksElapsed=%d",
@@ -251,5 +265,11 @@ public class TriAxisDifficultyManager {
         difficultyCache.clear();
         pollutionEmaCache.clear();
         lastUpdateTime.clear();
+        lastMcDayTickUpdate.clear();
+    }
+
+    public static long getLastDifficultyUpdateTick(ChunkPos chunkPos) {
+        Long lastUpdate = lastMcDayTickUpdate.get(chunkPos);
+        return lastUpdate != null ? lastUpdate : 0L;
     }
 }

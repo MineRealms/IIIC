@@ -146,7 +146,6 @@ dependencies {
 mixin {
     config "integratedindustrialcraft.mixins.json"
     config "integratedindustrialcraft.mixins.compat.json"
-    config "integratedindustrialcraft.mixins.gunmod.json"
 }
 
 jar {
@@ -159,7 +158,7 @@ jar {
                 "Implementation-Version"  : project.jar.archiveVersion,
                 "Implementation-Vendor"   : "flemmli97",
                 "Implementation-Timestamp": new Date().format("yyyy-MM-dd'T'HH:mm:ssZ"),
-                "MixinConfigs"            : "integratedindustrialcraft.mixins.json,integratedindustrialcraft.mixins.compat.json,integratedindustrialcraft.mixins.gunmod.json"
+                "MixinConfigs"            : "integratedindustrialcraft.mixins.json,integratedindustrialcraft.mixins.compat.json"
         ])
     }
 }

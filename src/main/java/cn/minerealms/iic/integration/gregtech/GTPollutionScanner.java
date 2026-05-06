@@ -98,12 +98,15 @@ public class GTPollutionScanner {
             gtHazardAvailable = true;
             IndustrialLogger.info("[IIC-PollutionSystem] ✓ GT Pollution Scanner initialized successfully");
         } catch (ClassNotFoundException e) {
-            IndustrialLogger.warn("[IIC-PollutionSystem] GT EnvironmentalHazardSavedData not found - pollution integration disabled");
-            IndustrialLogger.error("[IIC-PollutionSystem] ClassNotFoundException: " + e.getMessage(), e);
+            // GT versions below 1.9 don't have EnvironmentalHazardSavedData - this is normal
+            IndustrialLogger.info("[IIC-PollutionSystem] GT EnvironmentalHazardSavedData not found (GT version < 1.9), pollution integration disabled");
+            gtHazardAvailable = false;
         } catch (NoSuchMethodException e) {
-            IndustrialLogger.error("[IIC-PollutionSystem] GT API method not found: " + e.getMessage(), e);
+            IndustrialLogger.warn("[IIC-PollutionSystem] GT API method changed, disabling pollution integration: " + e.getMessage());
+            gtHazardAvailable = false;
         } catch (Exception e) {
-            IndustrialLogger.error("[IIC-PollutionSystem] Unexpected error during initialization: " + e.getMessage(), e);
+            IndustrialLogger.warn("[IIC-PollutionSystem] Error initializing GT pollution scanner, disabling: " + e.getMessage());
+            gtHazardAvailable = false;
         }
     }
 

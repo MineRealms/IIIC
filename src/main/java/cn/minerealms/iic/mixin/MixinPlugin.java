@@ -35,16 +35,28 @@ public class MixinPlugin implements IMixinConfigPlugin {
 
     @Override
     public boolean shouldApplyMixin(String targetClassName, String mixinClassName) {
-        // Check if EnhancedVisuals mixins should be applied
+        // Check if EnhancedVisuals mixins should be applied (client-only)
         if (mixinClassName.contains(".enhancedvisuals.")) {
+            // Only apply on client, never on server
+            boolean isClientSide = checkClientSide();
+            if (!isClientSide) {
+                LOGGER.info("[IIC-MixinPlugin] Skipping EnhancedVisuals mixin on server: {}", mixinClassName);
+                return false;
+            }
             boolean present = isClassPresent(ENHANCED_VISUALS_CLASS);
             LOGGER.info("[IIC-MixinPlugin] Checking EnhancedVisuals mixin: {} -> Target: {} -> Present: {}",
                 mixinClassName, targetClassName, present);
             return present;
         }
 
-        // Check if XaerosWorldMap mixins should be applied
+        // Check if XaerosWorldMap mixins should be applied (client-only)
         if (mixinClassName.contains(".xaeromap.")) {
+            // Only apply on client, never on server
+            boolean isClientSide = checkClientSide();
+            if (!isClientSide) {
+                LOGGER.info("[IIC-MixinPlugin] Skipping XaerosWorldMap mixin on server: {}", mixinClassName);
+                return false;
+            }
             boolean present = isClassPresent(XAEROS_WORLDMAP_CLASS);
             LOGGER.info("[IIC-MixinPlugin] Checking XaerosWorldMap mixin: {} -> Target: {} -> Present: {}",
                 mixinClassName, targetClassName, present);
@@ -53,6 +65,22 @@ public class MixinPlugin implements IMixinConfigPlugin {
 
         // Apply all other mixins by default
         return true;
+    }
+
+    /**
+     * Check if running on client side.
+     * @return true if client, false if server
+     */
+    private static boolean checkClientSide() {
+        try {
+            // Try to get Minecraft instance - only exists on client
+            Class.forName("net.minecraft.client.Minecraft", false, MixinPlugin.class.getClassLoader());
+            return true;
+        } catch (ClassNotFoundException e) {
+            return false;
+        } catch (Throwable t) {
+            return false;
+        }
     }
 
     @Override
@@ -95,6 +123,7 @@ public class MixinPlugin implements IMixinConfigPlugin {
 
     /**
      * Check if a class is present in the classpath.
+     * This method is safe to call on both client and server.
      *
      * @param className fully qualified class name
      * @return true if class exists
@@ -104,8 +133,9 @@ public class MixinPlugin implements IMixinConfigPlugin {
             Class.forName(className, false, MixinPlugin.class.getClassLoader());
             LOGGER.info("[IIC-MixinPlugin] Class found: {}", className);
             return true;
-        } catch (ClassNotFoundException e) {
-            LOGGER.warn("[IIC-MixinPlugin] Class not found: {}", className);
+        } catch (Throwable t) {
+            // Any exception or error means class not present or can't be loaded
+            LOGGER.warn("[IIC-MixinPlugin] Class not available: {} - {}", className, t.getMessage());
             return false;
         }
     }
