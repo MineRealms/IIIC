@@ -2,6 +2,7 @@ package cn.minerealms.iic.turrets.common.registry;
 import cn.minerealms.iic.IntegratedIndustrialCraft;
 import io.github.flemmli97.improvedmobs.ImprovedMobs;
 
+import cn.minerealms.iic.turrets.common.block_entity.CIWSTurretBlockEntity;
 import cn.minerealms.iic.turrets.common.block_entity.FlameThrowerTurretBlockEntity;
 import cn.minerealms.iic.turrets.common.block_entity.LaserTurretBlockEntity;
 import mekanism.common.inventory.container.tile.MekanismTileContainer;
@@ -16,5 +17,7 @@ public class ContainerTypeRegistry {
     public static final ContainerTypeRegistryObject<MekanismTileContainer<LaserTurretBlockEntity>> LASER_TURRET = CONTAINER_TYPES.custom("laser_turret", LaserTurretBlockEntity.class).build();
 
     public static final ContainerTypeRegistryObject<MekanismTileContainer<FlameThrowerTurretBlockEntity>> FLAMETHROWER_TURRET = CONTAINER_TYPES.custom("flamethrower_turret", FlameThrowerTurretBlockEntity.class).build();
+
+    public static final ContainerTypeRegistryObject<MekanismTileContainer<CIWSTurretBlockEntity>> CIWS_TURRET = CONTAINER_TYPES.custom("ciws_turret", CIWSTurretBlockEntity.class).build();
 
 }

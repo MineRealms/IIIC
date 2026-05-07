@@ -2,12 +2,15 @@ package cn.minerealms.iic.turrets.common.registry;
 import cn.minerealms.iic.IntegratedIndustrialCraft;
 import io.github.flemmli97.improvedmobs.ImprovedMobs;
 
+import cn.minerealms.iic.turrets.common.block.CIWSTurretBlock;
 import cn.minerealms.iic.turrets.common.block.ElectricFenceBlock;
 import cn.minerealms.iic.turrets.common.block.EnergyPedestalBlock;
 import cn.minerealms.iic.turrets.common.block.FlameThrowerTurretBlock;
 import cn.minerealms.iic.turrets.common.block.LaserTurretBlock;
+import cn.minerealms.iic.turrets.common.block_entity.CIWSTurretBlockEntity;
 import cn.minerealms.iic.turrets.common.block_entity.FlameThrowerTurretBlockEntity;
 import cn.minerealms.iic.turrets.common.block_entity.LaserTurretBlockEntity;
+import cn.minerealms.iic.turrets.common.item.CIWSTurretBlockItem;
 import cn.minerealms.iic.turrets.common.item.FlameThrowerTurretBlockItem;
 import cn.minerealms.iic.turrets.common.item.LaserTurretBlockItem;
 import mekanism.api.tier.ITier;
@@ -42,6 +45,9 @@ public class BlockRegistry {
 
     public static final BlockRegistryObject<FlameThrowerTurretBlock, FlameThrowerTurretBlockItem> FLAMETHROWER_TURRET = BLOCKS.register("flamethrower_turret",
             () -> new FlameThrowerTurretBlock(BlockTypeRegistry.FLAMETHROWER_TURRET), FlameThrowerTurretBlockItem::new);
+
+    public static final BlockRegistryObject<CIWSTurretBlock, CIWSTurretBlockItem> CIWS_TURRET = BLOCKS.register("ciws_turret",
+            () -> new CIWSTurretBlock(BlockTypeRegistry.CIWS_TURRET), CIWSTurretBlockItem::new);
 
     private static BlockRegistryObject<LaserTurretBlock, LaserTurretBlockItem> registerLaserTurret(BlockTypeTile<LaserTurretBlockEntity> type) {
         return registerTieredBlock(type, "_laser_turret", () -> new LaserTurretBlock(type), LaserTurretBlockItem::new);

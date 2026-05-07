@@ -2,274 +2,370 @@
 
 <div align="center">
 
-**A dynamic difficulty scaling addon for Improved Mobs based on industrial progression**
+**基于工业进度的动态难度缩放模组**
 
 [![Minecraft](https://img.shields.io/badge/Minecraft-1.20.1-green.svg)](https://www.minecraft.net/)
 [![Forge](https://img.shields.io/badge/Forge-47.1.3-orange.svg)](https://files.minecraftforge.net/)
 [![License](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
 
-[English](#english) | [中文](#中文)
-
 </div>
 
 ---
 
-## English
+## 目录
 
-### What is I3C?
-
-**I3C** (Improved Integrated Industrial Craft) is an addon for Improved Mobs that creates dynamic difficulty scaling based on your industrial progression. Like the I3C bus (an advanced version of I2C), this mod acts as a "bus" that integrates and connects various mods in your modpack, providing strong customization capabilities.
-
-The more machines you build, the higher the pollution, the harder the game becomes. Mobs will actively attack your machines, and new threats emerge as you progress through voltage tiers.
-
-### Key Features
-
-🏭 **Industrial Progression Scaling**
-- Difficulty increases based on machine count and voltage tiers (ULV → MAX)
-- Automatic detection of GregTech CEu Modern machines and multiblocks
-- Configurable voltage tier thresholds and difficulty curves
-
-☢️ **Dual-Layer Pollution System**
-- **Temporary Pollution**: Chunk-based, can be absorbed by environment (trees, water, grass)
-- **Permanent Pollution**: Global accumulation, directly increases difficulty
-- All GT machines executing recipes generate pollution based on voltage tier
-
-⚔️ **Voltage-Tier Based Threats**
-- **MV (Tier 2)**: Zombies attack machines when pollution ≥ 50
-- **HV (Tier 3+)**: Active zombie spawning when pollution ≥ 80
-- **HV (Tier 3+)**: Active creeper spawning when pollution ≥ 120
-- **Extreme**: Charged creeper spawning when pollution ≥ 200
-
-🔧 **Fully Configurable**
-- All parameters in `config/triaxis-difficulty.properties`
-- Difficulty presets: NORMAL, HARD, HARDCORE, INSANE, CUSTOM
-- Configure pollution rates, threat thresholds, spawn probabilities
-
-⚡ **Performance Optimized**
-- Async processing for all heavy operations
-- No server lag even with hundreds of machines
-- Optimized for large modpacks
-
-🔌 **Extensible API**
-- Public API for other mods to integrate
-- Custom difficulty providers, pollution sources, threat handlers
-- Comprehensive developer documentation
-
-### Compatibility
-
-**Required:**
-- Minecraft 1.20.1
-- Forge 47.1.3
-- Improved Mobs
-
-**Integrated:**
-- ✅ GregTech CEu Modern - Machine detection, voltage tiers, pollution generation
-- ✅ Spore (真菌孢子) - Hivemind proximity acceleration, pollution feedback
-- ✅ Mekanism - Laser turret system (4 tiers)
-
-**API Support:**
-- Any mod can integrate via `I3CAPI` class
-- See [DEVELOPER_GUIDE.md](DEVELOPER_GUIDE.md) for details
-
-### Installation
-
-1. Download I3C from [Releases](https://github.com/minerealms/improvedmobs-iic/releases)
-2. Place the JAR file in your `mods/` folder
-3. Install required dependencies (Improved Mobs)
-4. Launch the game and configure via `/im config` or edit `config/triaxis-difficulty.properties`
-
-### Quick Start
-
-**In-Game Commands:**
-```
-/im difficulty          - Check current difficulty
-/im pollution get ~ ~   - Check pollution in current chunk
-/im scan               - Scan nearby machines
-/im config preset HARD - Set difficulty preset
-/im debug on           - Enable debug logging
-```
-
-**Configuration:**
-Edit `config/triaxis-difficulty.properties` to customize:
-- Pollution generation rates
-- Threat trigger thresholds
-- Difficulty weights
-- Voltage tier parameters
-
-### Game Balance
-
-| Stage | Machine Count | Pollution | Difficulty | Threat Level |
-|-------|--------------|-----------|------------|--------------|
-| MV | 20-30 | 30-60 | +0.5~1.0 | Light |
-| HV | 40-60 | 80-150 | +1.5~2.5 | Medium |
-| IV-LuV | 100+ | 150-300 | +3.0~5.0 | High |
-| ZPM-UHV | 200+ | 300+ | +5.0+ | Extreme |
-
-### For Developers
-
-I3C provides a comprehensive API for mod integration:
-
-```java
-import cn.minerealms.iic.api.I3CAPI;
-
-// Query pollution
-double pollution = I3CAPI.getTemporaryPollution(chunkPos);
-
-// Add pollution from custom machines
-I3CAPI.addTemporaryPollution(chunkPos, 10.0);
-
-// Clean pollution (air scrubber)
-I3CAPI.cleanPollutionInRadius(level, centerPos, radiusChunks, cleanAmount);
-
-// Custom difficulty provider
-DifficultyFetcher.add(new MyDifficultyProvider());
-```
-
-See [DEVELOPER_GUIDE.md](DEVELOPER_GUIDE.md) for comprehensive documentation.
-
-### Credits
-
-- **MekanismTurrets** - Reference for code structure and art assets for laser turret system
-- **Improved Mobs** - Base mod for difficulty scaling and mob AI
-- **GregTech CEu Modern** - Machine detection and voltage tier system
-- **Spore (真菌孢子)** - Hivemind integration
-
-### License
-
-This project is licensed under the MIT License - see [LICENSE](LICENSE) for details.
-
-### Support
-
-- **Issues**: [GitHub Issues](https://github.com/minerealms/improvedmobs-iic/issues)
-- **Discord**: [MineRealms Discord](https://discord.gg/minerealms)
-- **Wiki**: [Documentation](https://wiki.minerealms.cn/i3c)
+1. [项目概述](#1-项目概述)
+2. [核心特性](#2-核心特性)
+3. [联动模组](#3-联动模组)
+4. [安装](#4-安装)
+5. [指令系统](#5-指令系统)
+6. [配置](#6-配置)
+7. [游戏平衡](#7-游戏平衡)
+8. [开发者API](#8-开发者api)
 
 ---
 
-## 中文
+## 1. 项目概述
 
-### 什么是 I3C？
+### 1.1 简介
 
-**I3C**（Improved Integrated Industrial Craft，改进的集成工业）是 Improved Mobs 的扩展模组，基于工业进度动态调整游戏难度。就像 I3C 总线（I2C 总线的升级版）一样，这个模组充当"总线"的角色，整合并联动整合包中的各种模组，提供强大的自定义能力。
+I3C（Improved Integrated Industrial Craft）是 Improved Mobs 的扩展模组，基于工业进度动态调整游戏难度。模拟 Factorio 的污染与难度系统理念，将工业进度与游戏难度紧密绑定。
 
-你建造的机器越多，污染越高，游戏难度就越大。怪物会主动攻击你的机器，随着电压等级的提升，新的威胁也会出现。
+**核心机制**：机器越多 → 污染越高 → 难度越大
 
-### 核心特性
+### 1.2 依赖
 
-🏭 **工业进度难度缩放**
-- 基于机器数量和电压等级（ULV → MAX）动态调整难度
-- 自动检测 GregTech CEu Modern 机器和多方块结构
-- 可配置的电压等级阈值和难度曲线
+| 组件 | 版本 |
+|------|------|
+| Minecraft | 1.20.1 |
+| Forge | 47.1.3 |
+| Improved Mobs | 1.20.1 |
 
-☢️ **双层污染系统**
-- **临时污染**：区块扩散，可被环境吸收（树木、水、草）
-- **永久污染**：全局累积，直接增加难度
-- 所有执行配方的 GT 机器都会根据电压等级产生污染
+### 1.3 包信息
 
-⚔️ **基于电压等级的威胁系统**
-- **MV（等级 2）**：污染 ≥50 时僵尸攻击机器
-- **HV（等级 3+）**：污染 ≥80 时主动生成僵尸
-- **HV（等级 3+）**：污染 ≥120 时主动生成苦力怕
-- **极限**：污染 ≥200 时生成闪电苦力怕
+- **模组ID**: `integratedindustrialcraft`
+- **包名**: `cn.minerealms.iic`
+- **入口类**: `IntegratedIndustrialCraft`
 
-🔧 **完全可配置**
-- 所有参数在 `config/triaxis-difficulty.properties` 中配置
-- 难度预设：普通、困难、硬核、疯狂、自定义
-- 配置污染速率、威胁阈值、生成概率
+---
 
-⚡ **性能优化**
-- 所有重型操作异步处理
-- 即使有数百台机器也不会卡服
-- 针对大型整合包优化
+## 2. 核心特性
 
-🔌 **可扩展 API**
-- 为其他模组提供公共 API
-- 自定义难度提供者、污染源、威胁处理器
-- 完整的开发者文档
+### 2.1 三轴难度系统
 
-### 兼容性
-
-**必需：**
-- Minecraft 1.20.1
-- Forge 47.1.3
-- Improved Mobs
-
-**已集成：**
-- ✅ GregTech CEu Modern - 机器检测、电压等级、污染生成
-- ✅ Spore（真菌孢子）- 虫巢邻近加速、污染反馈
-- ✅ Mekanism - 激光炮塔系统（4 个等级）
-
-**API 支持：**
-- 任何模组都可以通过 `I3CAPI` 类集成
-- 详见 [DEVELOPER_GUIDE.md](DEVELOPER_GUIDE.md)
-
-### 安装
-
-1. 从 [Releases](https://github.com/minerealms/improvedmobs-iic/releases) 下载 I3C
-2. 将 JAR 文件放入 `mods/` 文件夹
-3. 安装必需的依赖（Improved Mobs）
-4. 启动游戏，通过 `/im config` 配置或编辑 `config/triaxis-difficulty.properties`
-
-### 快速开始
-
-**游戏内命令：**
 ```
-/im difficulty          - 查看当前难度
-/im pollution get ~ ~   - 查看当前区块污染
-/im scan               - 扫描附近机器
-/im config preset HARD - 设置难度预设
-/im debug on           - 启用调试日志
+D = Base(T) × Scale(V) × Pressure(P) × GlobalMultiplier
 ```
 
-**配置：**
-编辑 `config/triaxis-difficulty.properties` 自定义：
-- 污染生成速率
-- 威胁触发阈值
-- 难度权重
-- 电压等级参数
+| 轴 | 名称 | 描述 |
+|----|------|------|
+| T | Time | 游戏时间（0.5-2.0），30天达到满值 |
+| V | Voltage | 电压等级（1.0-4.5），指数增长 |
+| P | Pollution | 污染压力（1.0-4.0），Sigmoid曲线 |
 
-### 游戏平衡
+### 2.2 双层污染系统
 
-| 阶段 | 机器数量 | 污染 | 难度 | 威胁等级 |
-|------|---------|------|------|---------|
-| MV | 20-30 | 30-60 | +0.5~1.0 | 轻微 |
-| HV | 40-60 | 80-150 | +1.5~2.5 | 中等 |
-| IV-LuV | 100+ | 150-300 | +3.0~5.0 | 高 |
-| ZPM-UHV | 200+ | 300+ | +5.0+ | 极限 |
+```
+┌─────────────────────────────────────────┐
+│  临时污染          │  永久污染            │
+│  (Chunk-based)   │  (Global)           │
+│  可被环境吸收     │  直接增加难度       │
+└─────────────────────────────────────────┘
+```
 
-### 开发者
+**污染公式**:
+```
+pollution = 0.21 × (tier+1)^1.3 × multiblockMultiplier
 
-I3C 提供完整的 API 用于模组集成：
+// 示例: EV多方块 (tier=4)
+// = 0.21 × 8.55 × 2.0 = 3.59/秒
+// 24小时 = 310 污染
+```
+
+**环境吸收**:
+- 草地: ~0.3/秒 (200块)
+- 树叶: ~0.375/秒 (150块)
+- 水: ~0.06/秒 (50块)
+
+### 2.3 威胁系统
+
+| 阶段 | 电压 | 污染阈值 | 威胁 |
+|------|------|----------|------|
+| MV | 2 | ≥50 | 僵尸攻击机器 |
+| HV | 3+ | ≥60 | 主动僵尸生成 |
+| HV | 3+ | ≥100 | 主动苦力怕生成 |
+| EV+ | 4+ | ≥180 | 闪电苦力怕 |
+
+### 2.4 增强AI
+
+- **ZombieDestroyMachineGoal**: 僵尸攻击机器（16格内）
+- **CreeperTargetMachineGoal**: 苦力怕定向爆炸
+
+### 2.5 炮塔系统
+
+| 类型 | 等级 | 伤害 | 射程 |
+|------|------|------|------|
+| 激光 | Basic | 10 | 16 |
+| 激光 | Advanced | 18 | 20 |
+| 激光 | Elite | 28 | 24 |
+| 激光 | Ultimate | 45 | 30 |
+| 火焰 | Basic | 4+火 | 12 |
+
+---
+
+## 3. 联动模组
+
+### 3.1 必需依赖
+
+- **ImprovedMobs**: 难度缩放基础
+
+### 3.2 可选集成
+
+```
+┌─────────────────────────────────────────┐
+│               ImprovedMobs              │
+│               (基础依赖)                │
+└─────────────────────────────────────────┘
+          │              │           │
+          ▼              ▼           ▼
+    ┌──────────┐   ┌──────────┐  ┌──────────┐
+    │GregTech  │   │  Spore   │  │ Mekanism │
+    │  CEu    │   │孢子集成  │  │ 能量系统 │
+    │机器检测 │   │虫巢进化  │  │激光炮塔 │
+    │电压等级 │   │污染反馈  │  │        │
+    └──────────┘   └──────────┘  └────────┘
+```
+
+| 模组 | 功能 |
+|------|------|
+| GregTech CEu Modern | 机器检测、电压等级、污染生成 |
+| Spore | 虫巢邻近加速、污染反馈、进化系统 |
+| Mekanism | 炮塔能量系统 |
+
+---
+
+## 4. 安装
+
+### 4.1 文件结构
+
+```
+mods/
+├── integratedindustrialcraft-*.jar    # 主模组
+├── improvedmobs-*.jar              # 依赖
+├── gtceu-*.jar                     # 推荐
+├── spore-*.jar                    # 可选
+└── mekanism-*.jar                # 可选
+```
+
+### 4.2 配置文件
+
+- 主配置: `config/triaxis-difficulty.properties`
+- 炮塔配置: `config/iic/turrets.toml`
+
+### 4.3 首次运行
+
+首次运行后自动生成默认配置文件，可编辑 `config/triaxis-difficulty.properties` 自定义所有参数。
+
+---
+
+## 5. 指令系统
+
+### 5.1 根指令
+
+```
+/im <子指令>
+```
+
+### 5.2 污染指令
+
+```
+/im pollution add <amount> [pos]      # 添加临时污染
+/im pollution remove <amount> [pos] # 移除临时污染
+/im pollution set <amount> [pos]     # 设置临时污染
+/im pollution clear [radius]       # 清除污染
+/im pollution permanent add <amt> # 添加永久污染
+/im pollution status [pos]        # 污染状态
+```
+
+### 5.3 难度指令
+
+```
+/im difficulty                    # 查看难度
+/im difficulty set <value>       # 设置难度
+/im difficulty reset             # 重置难度
+```
+
+### 5.4 配置指令
+
+```
+/im config preset <preset>          # 设置预设 (NORMAL/HARD/HARDCORE/INSANE/CUSTOM)
+/im config reload                # 重载配置
+/im config get <key>            # 获取配置值
+/im config set <key> <value>    # 设置配置值
+```
+
+### 5.5 其他指令
+
+```
+/im scan [radius]                # 扫描机器
+/im hud on|off                  # HUD显示
+/im debug on|off              # 调试日志
+/im horde status               # 尸潮状态
+/im spawn zombie <count> [pos]   # 生成僵尸
+/im spawn creeper <count> [pos]  # 生成苦力怕
+```
+
+---
+
+## 6. 配置
+
+### 6.1 难度预设
+
+| 预设 | 全局乘数 | 威胁 | 时间曲线 |
+|------|---------|------|----------|
+| NORMAL | 2.0 | 标准 | 800天 |
+| HARD | 2.5 | 提高 | 1000天 |
+| HARDCORE | 2.8 | 高 | 1200天 |
+| INSANE | 3.5 | 极限 | 1500天 |
+
+### 6.2 关键参数
+
+```properties
+# 难度系统
+difficultyPreset=NORMAL
+targetMaxDifficulty=250.0
+realWorldDaysToMax=30
+
+# 三轴参数
+baseMin=0.5
+baseMax=2.0
+scaleExponent=1.2
+scaleMultiplier=0.15
+pressureMax=4.0
+globalMultiplier=2.0
+
+# 污染系统
+basePollutionPerSecond=0.21
+pollutionTierExponent=1.3
+multiblockPollutionMultiplier=2.0
+tempToPermanentThreshold=200.0
+tempToPermanentRate=0.005
+naturalDecayRate=0.002
+
+# 威胁系统
+zombieSpawnChance=0.015
+creeperSpawnChance=0.008
+chargedCreeperChance=0.002
+```
+
+---
+
+## 7. 游戏平衡
+
+### 7.1 难度等级
+
+| 难度值 | 怪物属性 | 威胁 |
+|-------|---------|------|
+| 0-25 | 基础 | 无 |
+| 25-50 | +10% | 轻微 |
+| 50-75 | +25%,破坏方块 | 中等 |
+| 75-100 | +50% | 高 |
+| 100-150 | +100% | 很高 |
+| 150-200 | +150%,攻击机器 | 极限 |
+| 200-250 | +200%,闪电苦力怕 | 大师 |
+
+### 7.2 游戏阶段
+
+| 阶段 | 机器数 | 污染 | 难度 |
+|------|--------|------|------|
+| MV | 20-30 | 30-60 | +0.5~1.0 |
+| HV | 40-60 | 80-150 | +1.5~2.5 |
+| IV-LuV | 100+ | 150-300 | +3.0~5.0 |
+| ZPM-UHV | 200+ | 300+ | +5.0+ |
+
+---
+
+## 8. 开发者API
+
+### 8.1 污染API
 
 ```java
 import cn.minerealms.iic.api.I3CAPI;
 
-// 查询污染
+// 获取临时污染
 double pollution = I3CAPI.getTemporaryPollution(chunkPos);
 
-// 从自定义机器添加污染
-I3CAPI.addTemporaryPollution(chunkPos, 10.0);
+// 添加临时污染
+I3CAPI.addTemporaryPollution(chunkPos, amount);
 
-// 清理污染（空气净化器）
-I3CAPI.cleanPollutionInRadius(level, centerPos, radiusChunks, cleanAmount);
-
-// 自定义难度提供者
-DifficultyFetcher.add(new MyDifficultyProvider());
+// 清理污染
+I3CAPI.cleanPollutionInRadius(level, center, radius, amount);
 ```
 
-详见 [DEVELOPER_GUIDE.md](DEVELOPER_GUIDE.md) 获取完整文档。
+### 8.2 难度API
 
-### 致谢
+```java
+import io.github.flemmli97.improvedmobs.api.difficulty.DifficultyFetcher;
+import io.github.flemmli97.improvedmobs.api.difficulty.DifficultyGetter;
 
-- **MekanismTurrets** - 激光炮塔系统的代码结构和美术资源参考
-- **Improved Mobs** - 难度缩放和怪物 AI 的基础模组
-- **GregTech CEu Modern** - 机器检测和电压等级系统
-- **Spore（真菌孢子）** - 虫巢集成
+// 注册难度提供者
+DifficultyFetcher.add(
+    new ResourceLocation("modid", "name"),
+    new MyDifficultyGetter()
+);
 
-### 许可证
+// 实现接口
+public class MyDifficultyGetter implements DifficultyGetter {
+    @Override
+    public float getDifficulty(Level level, Vec3 pos) {
+        return calculatedDifficulty; // 0-250
+    }
+    
+    @Override
+    public Config.IntegrationType getType() {
+        return Config.IntegrationType.ADD; // 或ON
+    }
+}
+```
 
-本项目采用 MIT 许可证 - 详见 [LICENSE](LICENSE)。
+---
 
-### 支持
+# English
 
-- **问题反馈**：[GitHub Issues](https://github.com/MineRealms/IIIC/issues)
+## Overview
+
+I3C (Improved Integrated Industrial Craft) is a dynamic difficulty scaling addon for ImprovedMobs, integrating industrial mods to create a cohesive progression system.
+
+## Key Features
+
+- Tri-Axis Difficulty System (Time × Voltage × Pollution)
+- Dual-Layer Pollution (Temporary + Permanent)
+- Voltage-Based Threat System
+- Enhanced Mob AI (attack machines)
+- Laser Turret System (4 tiers)
+- Full API for mod integration
+
+## Commands
+
+```
+/im difficulty          - Check difficulty
+/im pollution status    - Check pollution
+/im scan               - Scan machines
+/im config preset     - Set preset
+/im debug on|off       - Toggle debug
+```
+
+## Configuration
+
+Edit `config/triaxis-difficulty.properties` to customize difficulty, pollution, and threat parameters. Four presets available: NORMAL, HARD, HARDCORE, INSANE.
+
+---
+
+## License
+
+MIT License - See [LICENSE](LICENSE).
+
+## Support
+
+- [GitHub Issues](https://github.com/MineRealms/IIIC/issues)
+- [Discord](https://discord.gg/minerealms)

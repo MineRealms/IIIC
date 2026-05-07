@@ -1,6 +1,8 @@
 package cn.minerealms.iic.turrets.common.registry;
 
 import cn.minerealms.iic.turrets.common.block.LaserTurretBlock;
+import cn.minerealms.iic.turrets.common.block_entity.CIWSTurretBlockEntity;
+import cn.minerealms.iic.turrets.common.block_entity.CIWSTurretTier;
 import cn.minerealms.iic.turrets.common.block_entity.FlameThrowerTurretBlockEntity;
 import cn.minerealms.iic.turrets.common.block_entity.FlameThrowerTurretTier;
 import cn.minerealms.iic.turrets.common.block_entity.LaserTurretBlockEntity;
@@ -27,6 +29,8 @@ public class BlockTypeRegistry {
 
     public static final BlockTypeTile<FlameThrowerTurretBlockEntity> FLAMETHROWER_TURRET = createFlameThrowerTurret(FlameThrowerTurretTier.BASIC, () -> BlockEntityTypeRegistry.FLAMETHROWER_TURRET, null);
 
+    public static final BlockTypeTile<CIWSTurretBlockEntity> CIWS_TURRET = createCIWSTurret(CIWSTurretTier.ELITE, () -> BlockEntityTypeRegistry.CIWS_TURRET, null);
+
     private static <TILE extends LaserTurretBlockEntity> BlockTypeTile<TILE> createLaserTurret(LaserTurretTier tier, Supplier<TileEntityTypeRegistryObject<TILE>> tile, Supplier<BlockRegistryObject<?, ?>> upgradeBlock) {
         return BlockTypeTile.BlockTileBuilder.createBlock(tile, MekanismTurretsLang.DESCRIPTION_LASER_TURRET)
                 .withGui(() -> ContainerTypeRegistry.LASER_TURRET)
@@ -48,6 +52,18 @@ public class BlockTypeRegistry {
                         () -> FloatingLong.create(tier.getFuelCapacity()))
                 .withSupportedUpgrades(EnumSet.of(Upgrade.SPEED, Upgrade.ENERGY, Upgrade.MUFFLING))
                 .withComputerSupport(tier, "FlameThrowerTurret")
+                .build();
+    }
+
+    private static <TILE extends CIWSTurretBlockEntity> BlockTypeTile<TILE> createCIWSTurret(CIWSTurretTier tier, Supplier<TileEntityTypeRegistryObject<TILE>> tile, Supplier<BlockRegistryObject<?, ?>> upgradeBlock) {
+        return BlockTypeTile.BlockTileBuilder.createBlock(tile, MekanismTurretsLang.DESCRIPTION_CIWS_TURRET)
+                .withGui(() -> ContainerTypeRegistry.CIWS_TURRET)
+                .with(new AttributeTier<>(tier), new AttributeUpgradeable(upgradeBlock), Attributes.SECURITY)
+                .without(AttributeParticleFX.class, AttributeStateFacing.class, Attributes.AttributeRedstone.class)
+                .withEnergyConfig(
+                        () -> FloatingLong.create(tier.getEnergyCapacity()))
+                .withSupportedUpgrades(EnumSet.of(Upgrade.SPEED, Upgrade.ENERGY, Upgrade.MUFFLING))
+                .withComputerSupport(tier, "CIWSTurret")
                 .build();
     }
 

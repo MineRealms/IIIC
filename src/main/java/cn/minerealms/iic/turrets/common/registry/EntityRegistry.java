@@ -2,8 +2,11 @@ package cn.minerealms.iic.turrets.common.registry;
 import cn.minerealms.iic.IntegratedIndustrialCraft;
 import io.github.flemmli97.improvedmobs.ImprovedMobs;
 
+import cn.minerealms.iic.turrets.common.entity.CIWSBulletEntity;
 import cn.minerealms.iic.turrets.common.entity.FlameEntity;
 import cn.minerealms.iic.turrets.common.entity.LaserEntity;
+import cn.minerealms.iic.turrets.common.entity.TurretProjectileEntity;
+import com.mrcrayfish.guns.entity.ProjectileEntity;
 import net.minecraft.resources.ResourceLocation;
 import net.minecraft.world.entity.EntityType;
 import net.minecraft.world.entity.MobCategory;
@@ -30,4 +33,20 @@ public class EntityRegistry {
                     .clientTrackingRange(128)
                     .updateInterval(1)
                     .build(new ResourceLocation(IntegratedIndustrialCraft.MODID, "flame").toString()));
+
+    public static final RegistryObject<EntityType<CIWSBulletEntity>> CIWS_BULLET = ENTITY_TYPES.register("ciws_bullet",
+            () -> EntityType.Builder.<CIWSBulletEntity>of(CIWSBulletEntity::new, MobCategory.MISC)
+                    .sized(0.25F, 0.25F)
+                    .noSave()
+                    .clientTrackingRange(128)
+                    .updateInterval(1)
+                    .build(new ResourceLocation(IntegratedIndustrialCraft.MODID, "ciws_bullet").toString()));
+
+    public static final RegistryObject<EntityType<TurretProjectileEntity>> TURRET_PROJECTILE = ENTITY_TYPES.register("turret_projectile",
+            () -> EntityType.Builder.<TurretProjectileEntity>of(TurretProjectileEntity::new, MobCategory.MISC)
+                    .sized(0.25F, 0.25F)
+                    .noSave()
+                    .clientTrackingRange(128)
+                    .updateInterval(1)
+                    .build(new ResourceLocation(IntegratedIndustrialCraft.MODID, "turret_projectile").toString()));
 }

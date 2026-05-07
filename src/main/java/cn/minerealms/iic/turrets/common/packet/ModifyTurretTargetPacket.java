@@ -1,9 +1,8 @@
 package cn.minerealms.iic.turrets.common.packet;
 
+import cn.minerealms.iic.turrets.common.block_entity.CIWSTurretBlockEntity;
 import cn.minerealms.iic.turrets.common.block_entity.FlameThrowerTurretBlockEntity;
 import cn.minerealms.iic.turrets.common.block_entity.LaserTurretBlockEntity;
-import net.minecraft.client.Minecraft;
-import net.minecraft.client.player.LocalPlayer;
 import net.minecraft.core.BlockPos;
 import net.minecraft.network.FriendlyByteBuf;
 import net.minecraft.server.level.ServerPlayer;
@@ -62,6 +61,17 @@ public class ModifyTurretTargetPacket {
                 }
                 flameTurret.markUpdated();
                 flameTurret.tryInvalidateTarget();
+            } else if (be instanceof CIWSTurretBlockEntity ciwsTurret) {
+                switch (index) {
+                    case 0 -> ciwsTurret.setTargetsHostile(value);
+                    case 1 -> ciwsTurret.setTargetsPassive(value);
+                    case 2 -> ciwsTurret.setTargetsPlayers(value);
+                    case 3 -> ciwsTurret.setTargetsTrusted(value);
+                    case 4 -> ciwsTurret.setAreaMode(value); // 攻击模式切换
+                    default -> throw new IllegalArgumentException("Invalid index: " + index);
+                }
+                ciwsTurret.markUpdated();
+                ciwsTurret.tryInvalidateTarget();
             }
         });
         context.get().setPacketHandled(true);

@@ -1,12 +1,15 @@
 package cn.minerealms.iic.turrets.client;
 import cn.minerealms.iic.IntegratedIndustrialCraft;
 
+import cn.minerealms.iic.turrets.client.gui.CIWSTurretScreen;
 import cn.minerealms.iic.turrets.client.gui.FlameThrowerTurretScreen;
 import cn.minerealms.iic.turrets.client.gui.LaserTurretScreen;
+import cn.minerealms.iic.turrets.client.renderer.CIWSTurretRenderer;
 import cn.minerealms.iic.turrets.client.renderer.FlameEntityRenderer;
 import cn.minerealms.iic.turrets.client.renderer.FlameThrowerTurretRenderer;
 import cn.minerealms.iic.turrets.client.renderer.LaserRenderer;
 import cn.minerealms.iic.turrets.client.renderer.LaserTurretRenderer;
+import cn.minerealms.iic.turrets.common.block_entity.CIWSTurretBlockEntity;
 import cn.minerealms.iic.turrets.common.block_entity.FlameThrowerTurretBlockEntity;
 import cn.minerealms.iic.turrets.common.block_entity.LaserTurretBlockEntity;
 import cn.minerealms.iic.turrets.common.registry.BlockEntityTypeRegistry;
@@ -40,6 +43,13 @@ public class ClientSetup {
         // 火焰喷射器炮塔
         event.registerBlockEntityRenderer(BlockEntityTypeRegistry.FLAMETHROWER_TURRET.get(), pContext -> new FlameThrowerTurretRenderer());
         event.registerEntityRenderer(EntityRegistry.FLAME.get(), FlameEntityRenderer::new);
+
+        // CIWS近防炮炮塔
+        event.registerBlockEntityRenderer(BlockEntityTypeRegistry.CIWS_TURRET.get(), CIWSTurretRenderer::new);
+
+        // CIWS子弹实体 - 使用Gun Mod的ProjectileRenderer
+        event.registerEntityRenderer(EntityRegistry.TURRET_PROJECTILE.get(),
+            context -> new com.mrcrayfish.guns.client.render.entity.ProjectileRenderer(context));
     }
 
     @SubscribeEvent
@@ -47,6 +57,7 @@ public class ClientSetup {
         event.register(Registries.MENU, helper -> {
             ClientRegistrationUtil.registerScreen(ContainerTypeRegistry.LASER_TURRET, LaserTurretScreen::new);
             ClientRegistrationUtil.registerScreen(ContainerTypeRegistry.FLAMETHROWER_TURRET, FlameThrowerTurretScreen::new);
+            ClientRegistrationUtil.registerScreen(ContainerTypeRegistry.CIWS_TURRET, CIWSTurretScreen::new);
         });
     }
 }
